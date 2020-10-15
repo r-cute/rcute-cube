@@ -1,0 +1,42 @@
+<html><head><meta charset="utf-8"/><title>rcute-cube</title></head><body>
+<h2>rcute-cube</h2>
+<p>info...</p>
+<h3>关于</h3><p>序列号 {sn}<br>MAC {mac}<br>WIFI {wifi} mode<br>IP {local_ip}<form action='upgrade?' id='upgradeForm'>
+固件: 最新版本 <span id='latest_ver'>...</span>，当前版本 <span id='ver'>{version}</span><span id='partial_upgrade' style='display:none'>(更新未完成)</span>
+<input type='submit' value='更新' style='display:none' id='upgrade'/></form></p>
+<h3>测试</h3>
+<form action='test'>功能及传感器测试 <input type='submit' value='测试'/></form>
+<h3>wifi 设置</h3>
+<form action='save_wifi' method='post'>
+SSID <input type='text' name='ssid' value='{ssid}'/><br>
+密码 <input type='password' id='pass' name='pw'/><a id='eye' href='#' onclick='showhide()'>显示</a><br><br>
+<input type="submit" value="保存" />
+</form></body><script>
+function q(d){return document.querySelector(d)}
+function showhide(){
+    var a=document.querySelector('#eye');
+    var p=document.querySelector('#pass');
+    if(a.innerText=='显示'){p.type='text';a.innerText='隐藏';}
+    else{p.type='password';a.innerText='显示';}
+}
+fetch('https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/version.h').then(d=>d.text()).then(d=>{
+	d=d.split('\n').map(a=>a.split(' ')[2].replaceAll('"',''));
+   	q('#latest_ver').innerText=d[0];
+	var sketch_url='sketch=https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/rcute-cube.ino.generic.bin';
+	var spiffs_url='spiffs=https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/spiffs.bin';
+   	if(d[0]!='{version}'){
+		q('#upgrade').style.display='inline';
+		switch(d[1]){
+			case 'both': q('#upgradeForm').action='upgrade?'+sketch_url+'&'+spiffs_url;break;
+			case 'sketch': q('#upgradeForm').action='upgrade?'+sketch_url;break;
+			case 'spiffs': q('#upgradeForm').action='upgrade?'+spiffs_url;break;
+		}
+	}else if('{upgrade_log}'!=d[1]){
+		q('#upgrade').style.display=q('#partial_upgrade').style.display='inline';
+		switch('{upgrade_log}'){
+			case 'spiffs': q('#upgradeForm').action='upgrade?'+sketch_url;break;
+			case 'sketch': q('#upgradeForm').action='upgrade?'+spiffs_url;break;
+		}
+	}
+});
+</script></html>

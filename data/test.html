@@ -1,0 +1,60 @@
+<html><head><meta charset="utf-8"/><title>rcute-cube</title>
+<script src="https://cdn.jsdelivr.net/npm/@ygoe/msgpack@1.0.2/msgpack.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/hyansuper/wsmprpc/js/client.min.js"></script>
+<script src="https://canvasjs.com/assets/script/canvasjs.min.js"></script></head><body>
+	<h3>RGB</h3>R<input type='range' id='r' value="0" oninput='rgb()' max="255"/><br>G<input oninput='rgb()' type='range' id='g' value="0" max="255"/><br>B<input type='range' id='b' value="0" max="255" oninput='rgb()'/>
+	<h3>传感器&nbsp;&nbsp;&nbsp;<button id='toggleSensor' onclick='sensor()'>开始</button></h3><div id='chart'></div>
+</body><script>
+function js_alter(b, src){if(b)document.write(unescape("%3Cscript src='"+src+"' type='text/javascript'%3E%3C/script%3E"));}
+function q(d){return document.querySelector(d)}
+function sleep(sec){return new Promise((r,j)=>{setTimeout(r,sec*1000)})}
+js_alter(typeof msgpack=='undefined', 'msgpack.min.js');
+js_alter(typeof RPCClient=='undefined', 'wsmprpc.client.js');
+js_alter(typeof CanvasJS=='undefined', 'canvasjs.min.js');</script><script defer>
+async function rgb(){await stub.rpc('rgb', [q('#r').value,q('#g').value,q('#b').value]);}
+var stub, dataLen=200,chart, dps=[], stream_rpc;
+async function sensor(){
+	var b=q('#toggleSensor');
+	if(b.innerText=='开始'){
+		b.innerText='停止';
+		for(var i=0;i<dps.length;i++){
+			for(var j=0;j<dataLen;j++) dps[i][j]={x:(j-dataLen)/dataLen*10,y:0};
+		}
+		chart.render();
+		stream_rpc=stub.rpc('mpu_stream', []);
+		for await(var e of stream_rpc) {
+			for(var i=0;i<dps.length;i++){
+				dps[i].shift();
+				dps[i].push({x:e[6],y:e[i]})
+			}
+			chart.render();
+		}
+		console.log("end stream");
+	}else{		
+		stream_rpc.cancel();
+		b.innerText='开始';
+	}
+}
+window.onload=()=>{
+	var names=["accX","accY","accZ","gyroX","gyroY","gyroZ","angX","angY","angZ","T"];
+	var dataSeries=[];
+	for(var i=0;i<names.length;i++) {	
+		dps.push([]);
+		for(var j=0;j<dataLen;j++) dps[i].push({x:(j-dataLen)/dataLen*10,y:0});
+		dataSeries.push({name:names[i],showInLegend:true,type:'spline',dataPoints:dps[i]});
+	}
+	chart=new CanvasJS.Chart("chart",{
+		legend:{itemclick: e=>{e.dataSeries.visible=!(typeof(e.dataSeries.visible) === "undefined" || e.dataSeries.visible);chart.render()}},
+		data:dataSeries,
+	});
+	chart.render();
+	var ws=new WebSocket("ws://rcute-cube-1ca7.local:81");//"+location.host+":81");
+	ws.onclose=e=>{console.log("[ws] close")};
+	ws.onerror=e=>{console.error("[ws] error: ",e)};
+	ws.onopen=async(e)=>{
+		console.log("[ws] open");
+		if('-1'==await new Promise(r=>{ws.onmessage=e=>{r(e.data)}})) {alert("请先关闭其他正在连接 rcute-cube 的程序");return;}
+		stub=new RPCClient(ws);
+	};
+};
+</script></html>
