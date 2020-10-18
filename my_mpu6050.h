@@ -1,38 +1,16 @@
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
-#include <Wire.h>
-#include "helper_3dmath.h"
+#include "Wire.h"
 #include "filter_buffer.h"
-/*
-void setAccelerometerRange(mpu6050_accel_range_t new_range) {
-  Adafruit_MPU6050::setAccelerometerRange(new_range);
-  if (new_range == MPU6050_RANGE_16_G)
-    accScale = 1.0/2048;
-  else if (new_range == MPU6050_RANGE_8_G)
-    accScale = 1.0/4096;
-  else if (new_range == MPU6050_RANGE_4_G)
-    accScale = 1.0/8192;
-  else if (new_range == MPU6050_RANGE_2_G)
-    accScale = 1.0/16384;
-  accScale *= SENSORS_GRAVITY_STANDARD;
-}
-
-void setGyroRange(mpu6050_gyro_range_t new_range) {
-  Adafruit_MPU6050::setGyroRange(new_range);
-  if (new_range == MPU6050_RANGE_250_DEG)
-    gyroScale = 1.0/131;
-  else if (new_range == MPU6050_RANGE_500_DEG)
-    gyroScale = 1.0/65.5;
-  else if (new_range == MPU6050_RANGE_1000_DEG)
-    gyroScale = 1.0/32.8;
-  else if (new_range == MPU6050_RANGE_2000_DEG)
-    gyroScale = 1.0/16.4;
-}
-*/
 #define INTERRUPT_PIN 15
 #define POWER_PIN 16
 
 typedef void (*MPUCallback)(void);
+volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
+void ICACHE_RAM_ATTR dmpDataReady() {
+    mpuInterrupt = true;
+}
+bool shakeFilter(float t){return t> 60.0f;}
 
 typedef enum{
   STATIC,
@@ -40,21 +18,17 @@ typedef enum{
   MOVING,
   MOTION_DETECTED
 }MPUState_t;
-
-volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
-void ICACHE_RAM_ATTR dmpDataReady() {mpuInterrupt = true;}
-bool shakeFilter(float t){return t> 60.0f;}
-
+float la=0;
 class MPUData {
   public:
   Quaternion ori;
   VectorFloat acc;
-  VectorFloat gyro;
+  VectorInt16 gyro;
   MPUState_t momentaryState;
   long time;
   void setMomentaryState(MPUData* lastData){
     if(lastData==NULL){momentaryState=MOVING; return;}
-    momentaryState=(acc.sub(lastData->acc).getMagnitude2()> 1.0f|| gyro.compLessThan(5.0f))?MOMENTARY_STATIC:MOVING;
+    momentaryState=(acc.sub(lastData->acc).getMagnitude2()< 1.0f /* && abs(acc.getMagnitude2()-(9.8*9.8))<1.0f */ && gyro.compLessThan(10))?MOMENTARY_STATIC:MOVING;
   }
   void copy(MPUData* c){
     ori.copy(c->ori);
@@ -65,9 +39,9 @@ class MPUData {
   }
 };
 
-class MyMPU6050: public MPU6050 {
-  
-protected:
+class MyMPU6050: public MPU6050{
+public:
+bool sleeping = true;
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
@@ -85,7 +59,6 @@ uint8_t fifoBuffer[64]; // FIFO storage buffer
 FilterBuffer accBuf;
 JsonArray* event_array;
 
-public:  
 MPUCallback cbEvent = NULL;
 MPUCallback cbUpdate = NULL;
 long momentaryStaticStart = 0;
@@ -96,74 +69,111 @@ void calibrate(int discardNumber=50, int calibrateNumber=100, int delayTime=5) {
   
 }
 
-uint8_t setup(JsonArray* ea){
-  pinMode(INTERRUPT_PIN, INPUT_PULLUP);
+void sleep(bool e){
+  setDMPEnabled(!e);
+  setSleepEnabled(e);
+  sleeping = e;
+}
+
+uint8_t setup(JsonArray* ea)
+{
   pinMode(POWER_PIN, OUTPUT);
   digitalWrite(POWER_PIN, 0);
   delay(500);
   digitalWrite(POWER_PIN, 1);
+  delay(500);
+  event_array = ea;
   Wire.begin();
-  Wire.setClock(400000);
-  event_array = ea;  
+  Wire.setClock(300000); // 400kHz I2C clock. Comment this line if having compilation difficulties
+  Serial.println(F("[mpu] Initializing I2C devices..."));
   initialize();
+  pinMode(INTERRUPT_PIN, INPUT_PULLUP);
   if(!testConnection()){
-    Serial.println(F("[mpu] connection failed"));
+    Serial.println(F("[mpu] MPU6050 connection failed"));    
     return 3;
   }
-  Serial.println(F("[mpu] connection successful"));
-  uint8_t devStatus = dmpInitialize();
-  if(devStatus){
+  delay(200);
+  Serial.println(F("[mpu] MPU6050 connection successful"));
+  Serial.println(F("[mpu] Initializing DMP..."));
+  devStatus = dmpInitialize();
+
+  // supply your own gyro offsets here, scaled for min sensitivity
+//  setXGyroOffset(220);
+//  setYGyroOffset(76);
+//  setZGyroOffset(-85);
+//  setZAccelOffset(1788); // 1688 factory default for my test chip
+
+  // make sure it worked (returns 0 if so)
+  if (devStatus) {
     // ERROR!
     // 1 = initial memory load failed
     // 2 = DMP configuration updates failed
     // (if it's going to break, usually the code will be 1)
-    Serial.printf("[mpu] DMP Initialization failed (code %d)", devStatus);
+    Serial.printf("[mpu] DMP Initialization failed (code %d)\n", devStatus);
     return devStatus;
   }
+  Serial.println(F("[mpu] Enabling DMP..."));
   setDMPEnabled(true);
+  Serial.println(F("[mpu] Enabling interrupt detection (Arduino external interrupt 0)..."));
   attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+  mpuIntStatus = getIntStatus();
   Serial.println(F("[mpu] DMP ready! Waiting for first interrupt..."));
   dmpReady = true;
   packetSize = dmpGetFIFOPacketSize();
   accBuf.filter = shakeFilter;
-  setSleepEnabled(true);
-  return 0;  
+  sleep(false);
+  return 0;
 }
 
-void enable(bool e){
-  setDMPEnabled(e);
-  setSleepEnabled(e);
-}
-
-void loop(){
+int temcou=0;
+void loop()
+{
+  // if programming failed, don't try to do anything
   if (!dmpReady) return;
+
+  // wait for MPU interrupt or extra packet(s) available
   if (!mpuInterrupt && fifoCount < packetSize) return;
+
+  // reset interrupt flag and get INT_STATUS byte
   mpuInterrupt = false;
   mpuIntStatus = getIntStatus();
+
+  // get current FIFO count
   fifoCount = getFIFOCount();
+  temcou++;
+  if(temcou>1000){temcou=0;Serial.print("x");}
+//  Serial.println(F("[mpu] get data!"));
+  // check for overflow (this should never happen unless our code is too inefficient)
   if ((mpuIntStatus & 0x10) || fifoCount == 1024) {
+    // reset so we can continue cleanly
     resetFIFO();
-    Serial.println(F("FIFO overflow!"));
-  }  else if (mpuIntStatus & 0x02) {
+    Serial.println(F("[mpu] FIFO overflow!"));
+
+    // otherwise, check for DMP data ready interrupt (this should happen frequently)
+  } else if (mpuIntStatus & 0x02) {
+    // wait for correct available data length, should be a VERY short wait
     while (fifoCount < packetSize) fifoCount = getFIFOCount();
+
+    // read a packet from FIFO
     getFIFOBytes(fifoBuffer, packetSize);
+
+    // track FIFO count here in case there is > 1 packet available
+    // (this lets us immediately read more without waiting for an interrupt)
     fifoCount -= packetSize;
-    
+
+
     dmpGetQuaternion(&(currData->ori), fifoBuffer);
     dmpGetAccel(&(currData->acc), fifoBuffer);
     dmpGetGyro(&(currData->gyro), fifoBuffer);
     currData->time = millis();
     currData->setMomentaryState(lastData);
-//    dmpGetGravity(&gravity, &q);
-//    dmpGetLinearAccel(&aaReal, &aa, &gravity);
-//    dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
-
     if(lastData){
       if(lastData->momentaryState == MOMENTARY_STATIC){
         if(currData->momentaryState == MOMENTARY_STATIC){ // m_static -> m_static
-          if(currData->time - momentaryStaticStart > 500){
+          if(currData->time - momentaryStaticStart > 250){
             if(lastStaticData && state == MOVING){ // no shake detected yet
-              //...
+              float ang = lastStaticData->acc.angleDeg(currData->acc);
+              Serial.printf("ang %f\n", ang);
             }            
             state = STATIC;
           }
@@ -195,33 +205,37 @@ void loop(){
     MPUData* temp = lastData;
     lastData = currData;
     currData = temp;
+  }else{
+    Serial.println(mpuIntStatus);
+    setDMPEnabled(false);
+    setDMPEnabled(true);
   }
+
+  
 }
 
 uint8_t dmpGetAccel(VectorFloat *q, const uint8_t* packet) {
-    // 8g
+    // 2g
     static int16_t qI[3];
     uint8_t status = MPU6050::dmpGetAccel(qI, packet);
     if (status == 0) {
-        q -> x = (float)qI[0] * 0.002392578125f;
-        q -> y = (float)qI[1] * 0.002392578125f;
-        q -> z = (float)qI[2] * 0.002392578125f;
+        q -> x = (float)qI[0] * 0.00119628906f;
+        q -> y = (float)qI[1] * 0.00119628906f;
+        q -> z = (float)qI[2] * 0.00119628906f;
         return 0;
     }
     return status;
 }
 
-uint8_t dmpGetGyro(VectorFloat *q, const uint8_t* packet) {
+uint8_t dmpGetGyro(VectorInt16 *q, const uint8_t* packet) {
     // 250 deg
     static int16_t qI[3];
     uint8_t status = MPU6050::dmpGetGyro(qI, packet);
-    if (status == 0) {
-        q -> x = (float)qI[0] * 0.00763358779f;
-        q -> y = (float)qI[1] * 0.00763358779f;
-        q -> z = (float)qI[2] * 0.00763358779f;
-        return 0;
+    if(status == 0){
+      q->x = qI[0];
+      q->y = qI[1];
+      q->z = qI[2];      
     }
     return status;
 }
-
 };

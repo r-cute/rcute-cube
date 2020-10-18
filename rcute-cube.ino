@@ -23,7 +23,7 @@ UpgradeHelper upgrade;
 RGB rgb;
 WIFI wifi;
 MyMPU6050 mpu;
-bool mpuStarted;
+uint8_t mpuStarted;
 long mpu_event_msgid, mpu_data_msgid, mpu_data_start;
 uint8_t client_id; 
 
@@ -95,19 +95,19 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               send_response(NULL, NULL);
             }*/else if(strcmp(method, "mpu_static")==0) {
               send_doc[2] = (char*)NULL;
-              send_doc[3] = mpu.state==STATIC;
+//              send_doc[3] = mpu.state==STATIC;
               serialize_send(send_doc);
             }else if(strcmp(method, "mpu_data")==0) {
               data_doc[1] = mpu_data_msgid = msgid;
               mpu_data_start = millis();
-              mpu.cbUpdate = mpuUpdate;
+//              mpu.cbUpdate = mpuUpdate;
             }else if(strcmp(method, "mpu_event")==0) {
               event_doc[1] = mpu_event_msgid = msgid;
-              mpu.cbEvent = mpuEvent;
+//              mpu.cbEvent = mpuEvent;
             }else if(strcmp(method, "mpu_gravity")==0) {
               send_doc[2] = (char*)NULL;
               JsonArray ja = send_doc.createNestedArray();
-              ja[0]=mpu.currData->acc.x;ja[1]=mpu.currData->acc.y;ja[2]=mpu.currData->acc.z;
+//              ja[0]=mpu.currData->acc.x;ja[1]=mpu.currData->acc.y;ja[2]=mpu.currData->acc.z;
               serialize_send(send_doc);
             }else {
               send_response("Unknown method", NULL);
@@ -116,17 +116,17 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             
           case MTYPE_REQUEST_CANCEL:
             Serial.printf("[rpc] %d, %ld\n", msgtype, msgid);
-            if(msgid== mpu_data_msgid) mpu.cbUpdate = NULL;
-            else if(msgid== mpu_event_msgid) mpu.cbEvent = NULL;
+//            if(msgid== mpu_data_msgid) mpu.cbUpdate = NULL;
+//            else if(msgid== mpu_event_msgid) mpu.cbEvent = NULL;
             break;
         }
       }
       break;
     case WStype_DISCONNECTED:
       Serial.printf("[ws] disconn (%u)\n", num);
-      mpu.cbUpdate = NULL;
-      mpu.cbEvent = NULL;
-      mpu.enable(true);
+//      mpu.cbUpdate = NULL;
+//      mpu.cbEvent = NULL;
+      //mpu.sleep(true);
       break;
     case WStype_CONNECTED:
       Serial.printf("[ws] conn (%u): %s\n", num, ip_str(webSocket.remoteIP(num)).c_str());
@@ -136,7 +136,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       }else{
         webSocket.sendTXT(num, "0");
         client_id = num;
-        mpu.enable(false);      
+        //mpu.sleep(true);      
       }
       break;
     case WStype_TEXT:
@@ -152,11 +152,8 @@ void send_file(const String& file, const String& type="text/html") {
   f.close();
 }
 
-#ifdef __AVR__
 typedef void (*TemplateHandler)(String& s);
-#else
-typedef std::function<void(String& s)> TemplateHandler;
-#endif
+
 void send_template(const TemplateHandler& fn, const String& file, const String& type="text/html") {
   Serial.printf("[server] tmp: %s\n", file.c_str());
   String s = read_file(file);
@@ -231,13 +228,13 @@ void setup() {
   data_trunck_array = data_doc.createNestedArray();
   event_trunck_array = event_doc.createNestedArray();
   rgb.setup();
+  rgb.led(true);
   Serial.begin(115200);  
   Serial.println(); 
   if(!SPIFFS.begin()) {
     Serial.println("FPIFFS error");
     rgb.blink_rgb(100, 0, 0, 2, 250, 750);
   }
-  rgb.blink_rgb(100, 0, 0, 1, 250, 750);
   rgb.blink_rgb(0, 100, 0, wifi.setup(), 250, 750);
   server.on("/", [](){send_template(handle_index_template, "/index.tmpl");});
   server.on("/save_wifi", handle_save_wifi);
@@ -254,17 +251,17 @@ void setup() {
   server.begin();
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
-  mpuStarted = mpu.setup(&event_trunck_array)+1;
-  if(mpuStarted!=1) {
+  mpuStarted = mpu.setup(&event_trunck_array);
+  if(mpuStarted) {
     Serial.println("MPU error");
-  }  
-  rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
-  rgb.blink(1, 250);
+    rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
+  }
+  // there should be no delay after mpu starts and immediately goto loop()
+  rgb.led(false);
 }
-
 void loop() {
+  mpu.loop();
   server.handleClient();
   webSocket.loop();
-  wifi.loop();
-  mpu.loop();
+  wifi.loop();  
 }

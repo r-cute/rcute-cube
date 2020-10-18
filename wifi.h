@@ -57,7 +57,7 @@ class WIFI {
     Serial.println("[mDNS] " + String(MDNS.begin(hostname)? hostname+".local": "error"));
     MDNS.addService("http", "tcp", 80);
     MDNS.addService("ws", "tcp", 81);
-    return mode=="STA"?1:2;
+    return mode=="STA"?0:1;
   }
   
   void save(String _ssid, String _pw) {

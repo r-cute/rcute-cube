@@ -327,9 +327,11 @@ DEBUG_PRINTLN(F("Resetting DMP..."));
 
 	DEBUG_PRINTLN(F("Setting DLPF bandwidth to 42Hz..."));
 	setDLPFMode(MPU6050_DLPF_BW_42);
+//  setDLPFMode(MPU6050_DLPF_BW_20);
 
 	DEBUG_PRINTLN(F("Setting gyro sensitivity to +/- 2000 deg/sec..."));
-	setFullScaleGyroRange(MPU6050_GYRO_FS_2000);
+  setFullScaleGyroRange(MPU6050_GYRO_FS_2000);
+//	setFullScaleGyroRange(MPU6050_GYRO_FS_250);
 
 	// load DMP code into memory banks
 	DEBUG_PRINT(F("Writing DMP code to MPU memory banks ("));

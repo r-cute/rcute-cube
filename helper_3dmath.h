@@ -156,6 +156,13 @@ class VectorInt16 {
             r.rotate(q);
             return r;
         }
+        void copy(VectorInt16& c){
+          x=c.x;y=c.y;z=c.z;
+        }
+
+        bool compLessThan(int16_t a){
+          return abs(x)<a && abs(y)<a && abs(z)<a;
+        }
 };
 
 class VectorFloat {
@@ -175,8 +182,14 @@ class VectorFloat {
             y = ny;
             z = nz;
         }
-
-        
+        float dot(VectorFloat& v){
+          return x*v.x+y*v.y+z*v.z;
+        }
+        float angleDeg(VectorFloat& v){
+          float a=(getMagnitude()*v.getMagnitude());
+          if(a==0) return 90;
+          return acos(max(-1.0f,min(1.0f,dot(v)/a))) * (180.0f/3.1415926f);
+        }
         
         float getMagnitude() {
             return sqrt(x*x + y*y + z*z);
