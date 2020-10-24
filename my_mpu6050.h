@@ -12,32 +12,7 @@ void ICACHE_RAM_ATTR dmpDataReady() {
     mpuInterrupt = true;
 }
 
-typedef enum{
-  STATIC,
-  MOMENTARY_STATIC,
-  MOVING,
-  MOTION_DETECTED
-}MPUState_t;
 
-class MPUData {
-  public:
-  Quaternion ori; // orientation
-  VectorFloat acc;
-  VectorInt16 gyro;
-  MPUState_t momentaryState;
-  long time;
-  void setMomentaryState(MPUData* lastData){
-    if(lastData==NULL){momentaryState=MOVING; return;}
-    momentaryState=(acc.sub(lastData->acc).getMagnitude2()< 0.01f /* && fabs(acc.getMagnitude2()-(9.8*9.8))<1.0f */ && gyro.compLessThan(6))?MOMENTARY_STATIC:MOVING;
-  }
-  void copy(MPUData* c){
-    ori.copy(c->ori);
-    acc.copy(c->acc);
-    gyro.copy(c->gyro);
-    momentaryState = c->momentaryState;
-    time = c->time;
-  }
-};
 
 class MyMPU6050: public MPU6050{
 public:
@@ -227,7 +202,7 @@ void loop(){
     currData->setMomentaryState(lastData);
     
     if(state==MOVING && lastStaticData && currData->momentaryState==MOVING)
-      accBuf.feed(currData->acc, lastStaticData->acc, (currData->time - lastData->time)/1000.0f);
+      accBuf.feed(currData->acc, currData->ori, (currData->time - lastData->time)/1000.0f);
       
     if(lastData){
       if(lastData->momentaryState == MOMENTARY_STATIC){
@@ -254,10 +229,11 @@ void loop(){
                       send("tapped", NULL);                      
                     }else {
                       char mc[3];
-                      if(accBuf.vel.getMagnitude2()>2500){ // tilt
+                      float velMag2=accBuf.vel.getMagnitude2(), distMag2=accBuf.dist.getMagnitude2();
+                      if(velMag2>900){ // tilt
                         accBuf.vel.getMainComp(mc);
                         send("tilted", mc);
-                      }else if(fabs(accBuf.dist.angleDeg(currData->acc)-90)<25 && accBuf.dist.getMagnitude2()> 4.0f) { // push 2cm
+                      }else if(fabs(accBuf.dist.angleDeg(currData->acc)-90)<20 && distMag2> 4.0f && velMag2<distMag2*16) { // push 2cm
                         accBuf.dist.getMainComp(mc);
                         send("pushed", mc);
                       }
@@ -275,7 +251,7 @@ void loop(){
             lastStaticData->copy(lastData);            
             state = MOVING;
 //            Serial.println("state: moving"); // debug print
-            accBuf.reset();
+            accBuf.reset(lastStaticData);
           }
         }
       }else{ //lastData->momentaryState == MOVING        
