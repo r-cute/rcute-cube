@@ -136,7 +136,12 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       }else{
         webSocket.sendTXT(num, "0");
         client_id = num;
-        mpu.sleep(false);      
+        mpuStarted = mpu.setup(&event_trunck_array);
+        if(mpuStarted) {
+          Serial.printf("MPU error %d\n", mpuStarted);
+          rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
+        }
+//        mpu.sleep(false);      
       }
       break;
     case WStype_TEXT:
@@ -267,11 +272,11 @@ void setup() {
   server.begin();
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
-  mpuStarted = mpu.setup(&event_trunck_array);
-  if(mpuStarted) {
-    Serial.printf("MPU error %d\n", mpuStarted);
-    rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
-  }
+//  mpuStarted = mpu.setup(&event_trunck_array);
+//  if(mpuStarted) {
+//    Serial.printf("MPU error %d\n", mpuStarted);
+//    rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
+//  }
   // there should be no delay after mpu starts and immediately goto loop()
   rgb.led(false);
 }

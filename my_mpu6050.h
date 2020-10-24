@@ -175,12 +175,13 @@ uint8_t setup(JsonArray* ea){
   Serial.println(F("[mpu] DMP ready! Waiting for first interrupt..."));
   dmpReady = true;
   packetSize = dmpGetFIFOPacketSize();
-  sleep(true);
+//  sleep(true);
+  sleeping=false;
   return 0;
 }
 
 void send(const char* a, const char* b){
-  Serial.print(a);  Serial.println(b); // debug print
+//  Serial.print(a);  Serial.println(b); // debug print
   (*event_array)[0]=a;
   (*event_array)[1]=b;
   if(cbEvent) cbEvent();
@@ -225,7 +226,7 @@ void loop(){
     currData->time = millis();
     currData->setMomentaryState(lastData);
     
-    if(state==MOVING && lastStaticData)
+    if(state==MOVING && lastStaticData && currData->momentaryState==MOVING)
       accBuf.feed(currData->acc, lastStaticData->acc, (currData->time - lastData->time)/1000.0f);
       
     if(lastData){
@@ -245,16 +246,21 @@ void loop(){
                   if(rot.angleDeg > 35) {
                     send("rotated", fabs(rot.axis.angleDeg(currData->acc))<10 ? "CCW":"CW");
                   } else if(rot.angleDeg < 15){ // no rotation, check horizontal move(push)
-//                    Serial.printf("push: ang:%f, dist.mag:%f\n", accBuf.dist.angleDeg(currData->acc),accBuf.dist.getMagnitude()); // debug print
+//                    Serial.printf("push: ang:%f, vel.mag:%f, dist.mag:%f\n", accBuf.dist.angleDeg(currData->acc),accBuf.vel.getMagnitude(),accBuf.dist.getMagnitude()); // debug print
 //                    Serial.printf("dist(x,y,z): %f, %f, %f\n",accBuf.dist.x, accBuf.dist.y, accBuf.dist.z);// debug print
 //                    Serial.printf("macc(x,y,z): %f, %f, %f, ang:%f\n",accBuf.macc.x, accBuf.macc.y, accBuf.macc.z, accBuf.macc.angleDeg(currData->acc));// debug print
                     ang = accBuf.macc.angleDeg(currData->acc); 
                     if((fabs(ang)<25 || fabs(ang-180)<25) && accBuf.macc.getMagnitude2()>3.0f){ // tap
-                      send("tapped", NULL);
-                    }else if(fabs(accBuf.dist.angleDeg(currData->acc)-90)<25 && accBuf.dist.getMagnitude2()> 10.0f) { // push 2cm
+                      send("tapped", NULL);                      
+                    }else {
                       char mc[3];
-                      accBuf.dist.getMainComp(mc);
-                      send("pushed", mc);
+                      if(accBuf.vel.getMagnitude2()>2500){ // tilt
+                        accBuf.vel.getMainComp(mc);
+                        send("tilted", mc);
+                      }else if(fabs(accBuf.dist.angleDeg(currData->acc)-90)<25 && accBuf.dist.getMagnitude2()> 4.0f) { // push 2cm
+                        accBuf.dist.getMainComp(mc);
+                        send("pushed", mc);
+                      }
                     }
                   }
                 }
