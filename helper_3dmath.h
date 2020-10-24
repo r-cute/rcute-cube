@@ -31,7 +31,7 @@ THE SOFTWARE.
 
 #ifndef _HELPER_3DMATH_H_
 #define _HELPER_3DMATH_H_
-
+#define RAD2DEG (180.0f/3.1415926f)
 class Quaternion {
     public:
         float w;
@@ -89,6 +89,15 @@ class Quaternion {
             r.normalize();
             return r;
         }
+
+           
+        Quaternion getRotationTo(Quaternion& q) {
+          return Quaternion(
+                w*q.w + x*q.x + y*q.y + z*q.z,  // new w
+                w*q.x - x*q.w - y*q.z + z*q.y,  // new x
+                w*q.y + x*q.z - y*q.w - z*q.x,  // new y
+                w*q.z - x*q.y + y*q.x - z*q.w); // new z       
+        }
 };
 
 class VectorInt16 {
@@ -141,7 +150,6 @@ class VectorInt16 {
 
             // quaternion multiplication: q * p, stored back in p
             p = q -> getProduct(p);
-
             // quaternion multiplication: p * conj(q), stored back in p
             p = p.getProduct(q -> getConjugate());
 
@@ -188,7 +196,7 @@ class VectorFloat {
         float angleDeg(VectorFloat& v){
           float a=(getMagnitude()*v.getMagnitude());
           if(a==0) return 90;
-          return acos(max(-1.0f,min(1.0f,dot(v)/a))) * (180.0f/3.1415926f);
+          return acos(max(-1.0f,min(1.0f,dot(v)/a))) * RAD2DEG;
         }
         
         float getMagnitude() {
@@ -200,13 +208,33 @@ class VectorFloat {
         float getMagnitude2() {
             return (x*x + y*y + z*z);
         }
-
+        void getMainComp(char a[]){          
+          a[2]='\0';
+          float ax=fabs(x),ay=fabs(y),az=fabs(z);
+          if(ax>=ay&&ax>=az){a[1]='X';a[0]=x>0?'+':'-';}
+          else if(ay>=ax&&ay>=az){a[1]='Y';a[0]=y>0?'+':'-';}
+          else{a[1]='Z';a[0]=z>0?'+':'-';}
+        }
         bool compLessThan(float a){
-          return abs(x)<a && abs(y)<a && abs(z)<a;
+          return fabs(x)<a && fabs(y)<a && fabs(z)<a;
         }
         VectorFloat sub(VectorFloat& s){
           return VectorFloat(x-s.x,y-s.y,z-s.z);
         }
+        void iadd(VectorFloat& s, float i){
+          x+=s.x*i; y+=s.y*i; z+=s.z*i;
+        }/*
+        VectorFloat getScaled(float s){
+          return VectorFloat(x*s, y*s, z*z);
+        }
+        
+        VectorFloat getSubProj(VectorFloat& p){
+          float d=p.getMagnitude2();
+          if(d==0)return VectorFloat();
+          VectorFloat f=p.getScaled(dot(p)/d);
+          f.x=x-f.x;  f.y=y-f.y;  f.z=z-f.z;
+          return f;
+        }*/
         void normalize() {
             float m = getMagnitude();
             x /= m;
@@ -226,9 +254,8 @@ class VectorFloat {
 
             // quaternion multiplication: q * p, stored back in p
             p = q -> getProduct(p);
-
             // quaternion multiplication: p * conj(q), stored back in p
-            p = p.getProduct(q -> getConjugate());
+            p = p.getProduct( q -> getConjugate());
 
             // p quaternion is now [0, x', y', z']
             x = p.x;
@@ -241,6 +268,22 @@ class VectorFloat {
             r.rotate(q);
             return r;
         }
+};
+
+class Rotation{
+  public: 
+  float angleDeg;
+  VectorFloat axis;
+  Rotation(Quaternion q){
+    angleDeg = acos(max(-1.0f,min(1.0f,q.w)))*2;
+    if(angleDeg){
+      float s = 1/sin(angleDeg/2);
+      axis.x=q.x*s;
+      axis.y=q.y*s;
+      axis.z=q.z*s;
+    }
+    angleDeg *= RAD2DEG;
+  }
 };
 
 #endif /* _HELPER_3DMATH_H_ */

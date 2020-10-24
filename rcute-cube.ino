@@ -54,7 +54,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
   int msgtype;
   switch(type) {
     case WStype_BIN:
-      Serial.printf("[ws] recv bin [%u]: ", num);
+//      Serial.printf("[ws] recv bin [%u]: ", num); // debug print
       err = deserializeMsgPack(recv_doc, payload, length);
       if(err) {
         Serial.print("deserializeMsgPack() failed: ");
@@ -70,7 +70,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             send_doc[1] = msgid;
             method = recv_doc[2];
             params = recv_doc[3].as<JsonArray>();
-            Serial.printf("[rpc] %d, %ld, %s, (%d)[...]\n", msgtype, msgid, method, params.size());
+//            Serial.printf("[rpc] %d, %ld, %s, (%d)[...]\n", msgtype, msgid, method, params.size()); // debug print
             
             if(strcmp(method, "rgb")==0) {
               rgb.rgb(params[0], params[1], params[2]);
@@ -95,19 +95,19 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               send_response(NULL, NULL);
             }*/else if(strcmp(method, "mpu_static")==0) {
               send_doc[2] = (char*)NULL;
-//              send_doc[3] = mpu.state==STATIC;
+              send_doc[3] = mpu.state==STATIC;
               serialize_send(send_doc);
             }else if(strcmp(method, "mpu_data")==0) {
               data_doc[1] = mpu_data_msgid = msgid;
               mpu_data_start = millis();
-//              mpu.cbUpdate = mpuUpdate;
+              mpu.cbUpdate = mpuUpdate;
             }else if(strcmp(method, "mpu_event")==0) {
               event_doc[1] = mpu_event_msgid = msgid;
-//              mpu.cbEvent = mpuEvent;
+              mpu.cbEvent = mpuEvent;
             }else if(strcmp(method, "mpu_gravity")==0) {
               send_doc[2] = (char*)NULL;
               JsonArray ja = send_doc.createNestedArray();
-//              ja[0]=mpu.currData->acc.x;ja[1]=mpu.currData->acc.y;ja[2]=mpu.currData->acc.z;
+              ja[0]=mpu.currData->acc.x;ja[1]=mpu.currData->acc.y;ja[2]=mpu.currData->acc.z;
               serialize_send(send_doc);
             }else {
               send_response("Unknown method", NULL);
@@ -116,17 +116,17 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             
           case MTYPE_REQUEST_CANCEL:
             Serial.printf("[rpc] %d, %ld\n", msgtype, msgid);
-//            if(msgid== mpu_data_msgid) mpu.cbUpdate = NULL;
-//            else if(msgid== mpu_event_msgid) mpu.cbEvent = NULL;
+            if(msgid== mpu_data_msgid) mpu.cbUpdate = NULL;
+            else if(msgid== mpu_event_msgid) mpu.cbEvent = NULL;
             break;
         }
       }
       break;
     case WStype_DISCONNECTED:
       Serial.printf("[ws] disconn (%u)\n", num);
-//      mpu.cbUpdate = NULL;
-//      mpu.cbEvent = NULL;
-      //mpu.sleep(true);
+      mpu.cbUpdate = NULL;
+      mpu.cbEvent = NULL;
+      mpu.sleep(true);
       break;
     case WStype_CONNECTED:
       Serial.printf("[ws] conn (%u): %s\n", num, ip_str(webSocket.remoteIP(num)).c_str());
@@ -136,7 +136,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       }else{
         webSocket.sendTXT(num, "0");
         client_id = num;
-        //mpu.sleep(true);      
+        mpu.sleep(false);      
       }
       break;
     case WStype_TEXT:
@@ -159,6 +159,14 @@ void send_template(const TemplateHandler& fn, const String& file, const String& 
   String s = read_file(file);
   fn(s);
   server.send(200, type, s);  
+}
+
+void handle_calibrate() {
+  Serial.println("[server] calibrate");
+  mpu.setSleepEnabled(false);
+  mpu.calibrate();
+  mpu.setSleepEnabled(true);
+  server.send(200, "text/plain", "");
 }
 
 void handle_index_template(String& html) {
@@ -197,8 +205,11 @@ void handle_upgrade() {
   send_redirect("正在更新，可能需要一两分钟...", String("upgrade_ret?sketch=")+(sketch_url.length()>0?"1":"0")+"&spiffs="+(spiffs_url.length()>0?"1":"0"), "30");
   if(sketch_url.length())
 	  if(HTTP_UPDATE_OK != upgrade.try_upgrade(sketch_url, "sketch", retry)) return;
-  if(spiffs_url.length())
-	  if(HTTP_UPDATE_OK == upgrade.try_upgrade(spiffs_url, "spiffs", retry)) wifi.save(wifi.ssid, wifi.pw);
+  if(spiffs_url.length()){
+    int offset[3];
+    bool readoffset = mpu.readOffsets(offset);
+	  if(HTTP_UPDATE_OK == upgrade.try_upgrade(spiffs_url, "spiffs", retry) && readoffset) {wifi.save(wifi.ssid, wifi.pw); mpu.saveOffsets(offset);}
+  }
 }
 
 void handle_upgrade_ret() {
@@ -214,11 +225,15 @@ void mpuEvent() {
 }
 
 void mpuUpdate() {
-//  for(uint8_t i=0;i<9;i++)
-//    data_trunck_array[i]=mpu.sensorData[i];
-//  data_trunck_array[9]=(millis()-mpu_data_start)/1000.0f;
-//  serializeMsgPack(data_doc, buf, BUF_SIZE);
-//  webSocket.sendBIN(client_id, buf, measureMsgPack(data_doc));
+  data_trunck_array[0]=mpu.currData->acc.x;
+  data_trunck_array[1]=mpu.currData->acc.y;
+  data_trunck_array[2]=mpu.currData->acc.z;
+  data_trunck_array[3]=mpu.currData->gyro.x;
+  data_trunck_array[4]=mpu.currData->gyro.y;
+  data_trunck_array[5]=mpu.currData->gyro.z;  
+  data_trunck_array[6]=(millis()-mpu_data_start)/1000.0f;
+  serializeMsgPack(data_doc, buf, BUF_SIZE);
+  webSocket.sendBIN(client_id, buf, measureMsgPack(data_doc));
 }
 
 void setup() {
@@ -248,12 +263,13 @@ void setup() {
   server.on("/upgrade_log", [](){send_file("/upgrade_log.txt", "text/plain");});
   server.on("/clear_upgrade_log", [](){upgrade.clear_log();});
   server.on("/format_fs", [](){send_body("Format SPIFFS..." + String(SPIFFS.format()? "completed": "error"));});
+  server.on("/cali", handle_calibrate);
   server.begin();
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
   mpuStarted = mpu.setup(&event_trunck_array);
   if(mpuStarted) {
-    Serial.println("MPU error");
+    Serial.printf("MPU error %d\n", mpuStarted);
     rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
   }
   // there should be no delay after mpu starts and immediately goto loop()

@@ -56,8 +56,8 @@ MPU6050::MPU6050(uint8_t address):devAddr(address) {
 void MPU6050::initialize() {
     setClockSource(MPU6050_CLOCK_PLL_XGYRO);
     setFullScaleGyroRange(MPU6050_GYRO_FS_250);
-    setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
-//    setFullScaleAccelRange(MPU6050_ACCEL_FS_8);
+//    setFullScaleAccelRange(MPU6050_ACCEL_FS_2);
+    setFullScaleAccelRange(MPU6050_ACCEL_FS_8);
     setSleepEnabled(false); // thanks to Jack Elston for pointing this one out!
 }
 
@@ -3328,7 +3328,7 @@ void MPU6050::PID(uint8_t ReadAddress, float kP,float kI, uint8_t Loops){
 				c = 0;
 				Serial.write('*');
 			}
-			if((eSum * ((ReadAddress == 0x3B)?.05: 1)) < 5) eSample++;	// Successfully found offsets prepare to  advance
+			if((eSum * ((ReadAddress == 0x3B)?0.05: 1)) < 5) eSample++;	// Successfully found offsets prepare to  advance
 			if((eSum < 100) && (c > 10) && (eSample >= 10)) break;		// Advance to next Loop
 			delay(1);
 		}
