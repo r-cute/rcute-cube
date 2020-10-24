@@ -1,2 +1,2 @@
-maxwell
-15959251165!
+ssid
+passwd

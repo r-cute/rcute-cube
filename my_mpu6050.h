@@ -231,7 +231,7 @@ void loop(){
                       char mc[3];
                       float velMag2=accBuf.vel.getMagnitude2(), distMag2=accBuf.dist.getMagnitude2();
                       if(velMag2>900){ // tilt
-                        accBuf.vel.getMainComp(mc);
+                        accBuf.vel.getMainCompInv(mc);
                         send("tilted", mc);
                       }else if(fabs(accBuf.dist.angleDeg(currData->acc)-90)<20 && distMag2> 4.0f && velMag2<distMag2*16) { // push 2cm
                         accBuf.dist.getMainComp(mc);
