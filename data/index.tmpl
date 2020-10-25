@@ -6,8 +6,8 @@
 <input type='submit' value='更新' style='display:none' id='upgrade'/></form></p>
 <h3>测试</h3>
 <form action='test'>功能及传感器测试 <input type='submit' value='测试'/></form>
-<!-- <h3>校准</h3>
-校准时，关闭所有连接，并放在静止的平面上 <button id='cali' onclick='calibrate()'>校准</button> -->
+<h3>校准</h3>
+校准时，关闭所有连接，并放在静止的平面上 <a href='cali'><button>校准</button></a>
 <h3>wifi 设置</h3>
 <form action='save_wifi' method='post'>
 SSID <input type='text' name='ssid' value='{ssid}'/><br>
@@ -15,10 +15,6 @@ SSID <input type='text' name='ssid' value='{ssid}'/><br>
 <input type="submit" value="保存" />
 </form></body><script>
 function q(d){return document.querySelector(d)}
-function calibrate(){
-	q('#cali').disabled=true;
-	fetch('cali').then(()=>{q('#cali').disabled=false;}).catch(e=>{alert(e);q('#cali').disabled=false;});
-}
 function showhide(){
     var a=document.querySelector('#eye');
     var p=document.querySelector('#pass');

@@ -13,7 +13,6 @@ void ICACHE_RAM_ATTR dmpDataReady() {
 }
 
 
-
 class MyMPU6050: public MPU6050{
 public:
 bool sleeping = true;
@@ -23,13 +22,15 @@ uint8_t devStatus;      // return status after each device operation (0 = succes
 uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
+int16_t raw[6];
+long rawUpdateTime = 0;
 
 // orientation/motion vars
 //Quaternion q;           // [w, x, y, z]         quaternion container
 VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
+//VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
 //VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
-VectorFloat gravity;    // [x, y, z]            gravity vector
+//VectorFloat gravity;    // [x, y, z]            gravity vector
 
 AccelBuffer accBuf;
 JsonArray* event_array;
@@ -39,10 +40,11 @@ MPUCallback cbUpdate = NULL;
 long momentaryStaticStart = 0;
 MPUData mpudata[3], *currData=mpudata, *lastData=NULL, *lastStaticData=NULL;
 MPUState_t state = MOVING;
+long updateTime = 0;
 
 void saveOffsets(int offset[]){
   StaticJsonDocument<200> doc;
-  for(uint8_t i=0;i<3;i++){
+  for(uint8_t i=0;i<6;i++){
     doc[i]=offset[i];  
   }
   File f=SPIFFS.open("/offset.json", "w");
@@ -64,44 +66,22 @@ uint8_t readOffsets(int offset[]){
     Serial.println(error.c_str());
     return 2;
   }
-  for(uint8_t i=0;i<3;i++){
+  for(uint8_t i=0;i<6;i++){
     offset[i]=doc[i];
   }
-  Serial.printf("[mpu] read offsets: %d, %d, %d\n", offset[0], offset[1], offset[2]);
+  Serial.printf("[mpu] read offsets: %d, %d, %d, %d, %d, %d\n", offset[0], offset[1], offset[2], offset[3], offset[4], offset[5]);
   return 0;
 }
 
 void setOffsets(int TheOffsets[]){
-  setXGyroOffset (TheOffsets [0]);
-  setYGyroOffset (TheOffsets [1]);
-  setZGyroOffset (TheOffsets [2]);
-//  setXAccelOffset(TheOffsets [0]);
-//  setYAccelOffset(TheOffsets [1]);
-//  setZAccelOffset(TheOffsets [2]);
-  
+  setXAccelOffset(TheOffsets [0]);
+  setYAccelOffset(TheOffsets [1]);
+  setZAccelOffset(TheOffsets [2]);
+  setXGyroOffset (TheOffsets [3]);
+  setYGyroOffset (TheOffsets [4]);
+  setZGyroOffset (TheOffsets [5]);    
 }
   
-void calibrate(uint16_t discardNumber=5000, uint16_t calibrateNumber=500, int delayTime=5) {
-  int32_t sum[3]={0,0,0};
-  int16_t reading[6];
-  for(uint16_t loop=0;loop<discardNumber;loop++){
-    getMotion6(&reading[0],&reading[1],&reading[2],&reading[3],&reading[4],&reading[5]);
-    delay(delayTime);
-  }
-  for(uint16_t loop=0;loop<calibrateNumber;loop++){
-    getMotion6(&reading[0],&reading[1],&reading[2],&reading[3],&reading[4],&reading[5]);
-    delay(delayTime);
-    for(uint8_t i=0;i<3;i++){
-      sum[i]+=reading[i+3];
-    }
-  }
-  for(uint8_t i=0;i<3;i++){
-    sum[i]/=calibrateNumber;
-  }
-  saveOffsets(sum);
-  setOffsets(sum);
-}
-
 void sleep(bool e){
   setSleepEnabled(e);
   setDMPEnabled(!e);
@@ -128,10 +108,10 @@ uint8_t setup(JsonArray* ea){
   Serial.println(F("[mpu] Initializing DMP..."));
   devStatus = dmpInitialize();
 
-//  int offsets[3];
-//  if(readOffsets(offsets)==0){
-//    setOffsets(offsets);
-//  }
+  int offsets[6];
+  if(readOffsets(offsets)==0){
+    setOffsets(offsets);
+  }
   
   // make sure it worked (returns 0 if so)
   if (devStatus) {
@@ -150,8 +130,7 @@ uint8_t setup(JsonArray* ea){
   Serial.println(F("[mpu] DMP ready! Waiting for first interrupt..."));
   dmpReady = true;
   packetSize = dmpGetFIFOPacketSize();
-//  sleep(true);
-  sleeping=false;
+  sleeping =false;
   return 0;
 }
 
@@ -200,11 +179,18 @@ void loop(){
     dmpGetGyro(&(currData->gyro), fifoBuffer);
     currData->time = millis();
     currData->setMomentaryState(lastData);
+
+    if(cbUpdate && currData->time - rawUpdateTime> 50){
+      rawUpdateTime = currData->time;
+      getMotion6(&raw[0],&raw[1],&raw[2],&raw[3],&raw[4],&raw[5]);
+      cbUpdate();      
+    }
+
     
     if(state==MOVING && lastStaticData && currData->momentaryState==MOVING)
       accBuf.feed(currData->acc, currData->ori, (currData->time - lastData->time)/1000.0f);
       
-    if(lastData){
+    if(cbEvent && lastData){
       if(lastData->momentaryState == MOMENTARY_STATIC){
         if(currData->momentaryState == MOMENTARY_STATIC){// m_static -> m_static
           if(state==MOVING){
@@ -280,8 +266,6 @@ void loop(){
       }
     }
 
-    if(cbUpdate) cbUpdate();
-    
     // swap currData and lastData
     if(lastData==NULL) lastData= mpudata+1;
     MPUData* temp = lastData;

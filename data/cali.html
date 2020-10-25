@@ -1,0 +1,62 @@
+<html><head><meta charset="utf-8"/><title>rcute-cube</title>
+<script src="https://cdn.jsdelivr.net/npm/@ygoe/msgpack@1.0.2/msgpack.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/hyansuper/wsmprpc/js/client.min.js"></script></head><body>
+<h2>校准</h2>
+<p style='background-color:yellow;text-align:left;color:red;padding:10px;'>出厂时已经调试好，一般不需要再进行校准</p>
+<p>校准时，关闭所有连接，将魔方放在静止的平面上，完成六个面的校准后，点击保存</p><div id='cali'>
+<p id='+x'>+X 面朝上 <button data='0'>校准</button> <span></span></p>
+<p id='-x'>-X 面朝上 <button data='1'>校准</button> <span></span></p>
+<p id='+y'>+Y 面朝上 <button data='2'>校准</button> <span></span></p>
+<p id='-y'>-Y 面朝上 <button data='3'>校准</button> <span></span></p>
+<p id='+z'>+Z 面朝上 <button data='4'>校准</button> <span></span></p>
+<p id='-z'>-Z 面朝上 <button data='5'>校准</button> <span></span></p></div>
+<p id='save'><button disabled>保存</button> <span></span></p>
+<script>
+function js_alter(b, src){if(b)document.write(unescape("%3Cscript src='"+src+"' type='text/javascript'%3E%3C/script%3E"));}
+js_alter(typeof msgpack=='undefined', 'msgpack.min.js');
+js_alter(typeof RPCClient=='undefined', 'wsmprpc.client.js');
+function q(d){return document.querySelector(d)}function qa(d){return document.querySelectorAll(d)}
+</script><script defer>
+var offset=[], stub, avg=[];
+var discardNum=200, caliNum=200;
+qa('#cali>p>button').forEach(b=>{b.onclick=async()=>{
+	qa('button').forEach(a=>{a.disabled=true});	
+	var count=0;
+	var stream_rpc=stub.rpc('mpu_raw', []);
+	for await(var e of stream_rpc){
+		count++;if(count==discardNum)break;
+	}
+	var av=[0,0,0,0];count=0;
+	for await(var e of stream_rpc){
+		av[0]+=e[b.getAttribute('data')];
+		for(var ii=1;ii<4;ii++)av[ii]+=e[ii+2];
+		count++;if(count==caliNum)break;
+	}
+	stream_rpc.cancel();
+	for(var ii=0;ii<4;ii++)av[ii]/=caliNum;
+	avg[b.getAttribute('data')]=av;
+	qa('#cali button').forEach(a=>{a.disabled=false});
+	b.parentElement.getElementsByTagName('span')[0].innerText='已完成';
+	if(Array.from(qa('#cali span')).find(e=>e.textContent=='')==undefined)
+		q('#save>button').disabled=false;
+};});
+q('#save>button').onclick=()=>{
+	for(var ii=0;ii<3;ii++)
+		offset[ii]=parseInt((avg[ii*2][0]+avg[ii*2+1][0])/2);
+	for(var jj=0;jj<3;jj++){
+		offset[jj+3]=0;
+		for(var ii=0;ii<6;ii++)
+			offset[jj+3]+=avg[ii][jj+1];
+		offset[jj+3]/=6;
+	}
+	fetch('save_cali?offset='+offset.join()).then(d=>d.text()).then(a=>{q('#save>span').innerText=a;setTimeout(()=>{q('#save>span').innerText=''},5000);}).catch(alert);
+};
+var ws=new WebSocket("ws://"+location.host+":81");
+ws.onclose=e=>{console.log("[ws] close");clearInterval(interval)};
+ws.onerror=e=>{console.error("[ws] error: ",e)};
+ws.onopen=async(e)=>{
+	console.log("[ws] open");
+	if('-1'==await new Promise(r=>{ws.onmessage=e=>{r(e.data)}})) {alert("请先关闭其他正在连接 rcute-cube 的程序");return;}
+	stub=new RPCClient(ws);	
+};
+</script></body></html>

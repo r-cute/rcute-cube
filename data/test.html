@@ -11,8 +11,7 @@ function js_alter(b, src){if(b)document.write(unescape("%3Cscript src='"+src+"' 
 function q(d){return document.querySelector(d)}
 function sleep(sec){return new Promise((r,j)=>{setTimeout(r,sec*1000)})}
 js_alter(typeof msgpack=='undefined', 'msgpack.min.js');
-js_alter(typeof RPCClient=='undefined', 'wsmprpc.client.js');
-js_alter(typeof CanvasJS=='undefined', 'canvasjs.min.js');</script><script defer>
+js_alter(typeof RPCClient=='undefined', 'wsmprpc.client.js');</script><script defer>
 async function rgb(){await stub.rpc('rgb', [q('#r').value,q('#g').value,q('#b').value]);}
 var stub, dataLen=200,chart, dps=[], stream_rpc, interval;
 async function sensor(){
@@ -23,7 +22,7 @@ async function sensor(){
 			for(var j=0;j<dataLen;j++) dps[i][j]={x:(j-dataLen)/dataLen*10,y:0};
 		}
 		chart.render();
-		stream_rpc=stub.rpc('mpu_data', []);
+		stream_rpc=stub.rpc('mpu_raw', []);
 		for await(var e of stream_rpc) {
 			for(var i=0;i<dps.length;i++){
 				dps[i].shift();
