@@ -51,7 +51,7 @@ String brief_upgrade_log() {
 }
 
 void append_log(String type, String mes){
-  File f=SPIFFS.open("/upgrade_log.txt", "w+");
+  File f=SPIFFS.open("/upgrade_log.txt", "a+");
   Serial.printf("%s, %s\n", type.c_str(), mes.c_str());
   f.printf("%s, %s\n", type.c_str(), mes.c_str());
   f.close();

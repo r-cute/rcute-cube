@@ -2,7 +2,7 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
 #include "acc_buffer.h"
-#define INTERRUPT_PIN 15
+#define INTERRUPT_PIN 14
 #define POWER_PIN 16
 // connect AD0 to GND
 
@@ -43,6 +43,7 @@ MPUState_t state = MOVING;
 long updateTime = 0;
 
 void saveOffsets(int offset[]){
+  /*
   StaticJsonDocument<200> doc;
   for(uint8_t i=0;i<6;i++){
     doc[i]=offset[i];  
@@ -52,12 +53,19 @@ void saveOffsets(int offset[]){
   f.close();
   Serial.print("[mpu] save offsets serialized: ");
   serializeJson(doc, Serial);  
-  Serial.println();
+  Serial.println();*/
+  int6 i6;  
+  for(uint8_t o=0;o<6;o++)
+    i6.i[o] = offset[o];
+  EEPROM.put(EEPROM_OFFSET, i6);
+  EEPROM.commit();
+  Serial.printf("[mpu] save offsets: %d, %d, %d, %d, %d, %d\n", i6.i[0], i6.i[1], i6.i[2], i6.i[3], i6.i[4], i6.i[5]);
 }
 
 uint8_t readOffsets(int offset[]){
+  /*
   File f=SPIFFS.open("/offset.json", "r");
-  if(!f) return 1;
+  if(!f) return 1;  
   StaticJsonDocument<200> doc;
   DeserializationError error = deserializeJson(doc, f);  
   f.close();
@@ -68,7 +76,11 @@ uint8_t readOffsets(int offset[]){
   }
   for(uint8_t i=0;i<6;i++){
     offset[i]=doc[i];
-  }
+  }*/
+  int6 i6;
+  EEPROM.get(EEPROM_OFFSET, i6);
+  for(uint8_t o=0;o<6;o++)
+    offset[o] = i6.i[o];
   Serial.printf("[mpu] read offsets: %d, %d, %d, %d, %d, %d\n", offset[0], offset[1], offset[2], offset[3], offset[4], offset[5]);
   return 0;
 }
@@ -108,10 +120,10 @@ uint8_t setup(JsonArray* ea){
   Serial.println(F("[mpu] Initializing DMP..."));
   devStatus = dmpInitialize();
 
-  int offsets[6];
-  if(readOffsets(offsets)==0){
-    setOffsets(offsets);
-  }
+//  int offsets[6];
+//  if(readOffsets(offsets)==0){
+//    setOffsets(offsets);
+//  }
   
   // make sure it worked (returns 0 if so)
   if (devStatus) {
@@ -193,10 +205,10 @@ void loop(){
     if(cbEvent && lastData){
       if(lastData->momentaryState == MOMENTARY_STATIC){
         if(currData->momentaryState == MOMENTARY_STATIC){// m_static -> m_static
-          if(state==MOVING){
-            float duration = currData->time - momentaryStaticStart;
-            if(duration > 300){
-              if(lastStaticData && currData->time - lastStaticData->time < 2000){
+          float duration = currData->time - momentaryStaticStart;
+          if(duration > 300){            
+            if(state==MOVING){
+              if(lastStaticData && currData->time - lastStaticData->time < 2500){
                 float ang = lastStaticData->acc.angleDeg(currData->acc);
   //              Serial.printf("ang %f\n", ang); // debug print
                 if(fabs(ang-90)<15) send("flipped", "90");
@@ -227,9 +239,8 @@ void loop(){
                   }
                 }
               }
-              state = STATIC;
-//              Serial.println("state: static"); // debug print
             }
+            if(state!=STATIC) state = STATIC;
           }
         }else { //currData->momentaryState == MOVING: m_static -> m_moving
           if(state == STATIC){

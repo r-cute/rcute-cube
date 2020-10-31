@@ -15,13 +15,20 @@ class WIFI {
   String sn, hostname, mac, local_ip, ssid, mode, pw;
   
   uint8_t setup() {
+    /*
     String s = read_file("/wifi.txt");
     int sep = s.indexOf('\n');
     ssid = s.substring(0, sep);
     ssid.trim();
     pw = s.substring(sep+1);
-    pw.trim();
-    
+    pw.trim();*/
+
+    char30 s, p;
+    EEPROM.get(EEPROM_SSID, s);
+    EEPROM.get(EEPROM_PW, p);
+    ssid = String(s.str);
+    pw = String(p.str);
+
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, pw);
     Serial.print("[wifi] STA mode");
@@ -59,14 +66,22 @@ class WIFI {
     MDNS.addService("ws", "tcp", 81);
     return mode=="STA"?0:1;
   }
-  
+
   void save(String _ssid, String _pw) {
+    /*
      File file = SPIFFS.open("/wifi.txt", "w");
      file.println(_ssid + "\n" + _pw);
-     file.close();
+     file.close();*/
+     char30 s, p;
+     memcpy(s.str, _ssid.c_str(), _ssid.length()+1);
+     memcpy(p.str, _pw.c_str(), _pw.length()+1);
+     EEPROM.put(EEPROM_SSID, s);
+     EEPROM.put(EEPROM_PW, p);
+     EEPROM.commit();
      Serial.println("[wifi] saved: " + _ssid + "/" + _pw);
      ssid =_ssid;
-  }
+     pw =_pw;
+  }  
 
   void loop() {    
     MDNS.update();

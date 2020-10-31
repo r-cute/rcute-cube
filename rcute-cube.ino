@@ -3,6 +3,7 @@
 #include <ESP8266mDNS.h>
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
+#include "eeprom_helper.h"
 #include "msg_type.h"
 #include "my_mpu6050.h"
 #include "wifi.h"
@@ -127,6 +128,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       mpu.cbUpdate = NULL;
       mpu.cbEvent = NULL;
       mpu.sleep(true);
+      rgb.rgb(0,0,0);
       break;
     case WStype_CONNECTED:
       Serial.printf("[ws] conn (%u): %s\n", num, ip_str(webSocket.remoteIP(num)).c_str());
@@ -139,9 +141,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         mpuStarted = mpu.setup(&event_trunck_array);
         if(mpuStarted) {
           Serial.printf("MPU error %d\n", mpuStarted);
-          rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
+          rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);          
+          mpu.sleep(true);
         }
-//        mpu.sleep(false);      
       }
       break;
     case WStype_TEXT:
@@ -187,7 +189,7 @@ void handle_save_wifi() {
     ret = String("错误： SSID为空");
   } else {
     wifi.save(ssid, pw);
-    ret = String("wifi 设置已保存，重启后生效<br><form action='reboot'><input type='submit' value='重启'/></form>");    
+    ret = String("wifi 设置已保存，重启后生效<br><br><form action='reboot'><input type='submit' value='重启'/></form>");    
     rgb.blink_rgb(0, 100, 0, 1, 250);
   }
   send_body(ret); 
@@ -207,6 +209,7 @@ void handle_save_cali() {
 }
 
 void handle_upgrade() {
+  mpu.sleep(true);
   String sketch_url = server.arg("sketch");
   String spiffs_url = server.arg("spiffs");
   int retry= server.arg("retry").toInt();
@@ -215,11 +218,8 @@ void handle_upgrade() {
   send_redirect("正在更新，可能需要一两分钟...", String("upgrade_ret?sketch=")+(sketch_url.length()>0?"1":"0")+"&spiffs="+(spiffs_url.length()>0?"1":"0"), "30");
   if(sketch_url.length())
 	  if(HTTP_UPDATE_OK != upgrade.try_upgrade(sketch_url, "sketch", retry)) return;
-  if(spiffs_url.length()){
-    int offset[3];
-    bool readoffset = mpu.readOffsets(offset);
-	  if(HTTP_UPDATE_OK == upgrade.try_upgrade(spiffs_url, "spiffs", retry) && readoffset) {wifi.save(wifi.ssid, wifi.pw); mpu.saveOffsets(offset);}
-  }
+  if(spiffs_url.length())    
+	  upgrade.try_upgrade(spiffs_url, "spiffs", retry);
 }
 
 void handle_upgrade_ret() {
@@ -251,7 +251,8 @@ void setup() {
   rgb.setup();
   rgb.led(true);
   Serial.begin(115200);  
-  Serial.println(); 
+  Serial.println();
+  EEPROM.begin(512);
   if(!SPIFFS.begin()) {
     Serial.println("FPIFFS error");
     rgb.blink_rgb(100, 0, 0, 2, 250, 750);
