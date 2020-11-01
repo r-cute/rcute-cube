@@ -217,7 +217,7 @@ void loop(){
                 float ang = lastStaticData->acc.angleDeg(currData->acc);
   //              Serial.printf("ang %f\n", ang); // debug print
                 if(fabs(ang-90)<15) send("flipped", "90");
-                else if(fabs(ang-180)<15) send("flipped", "180");
+                else if(fabs(ang-180)<25) send("flipped", "180");
                 else if(fabs(ang)<15) {// no flip, check horitontal rotation
                   Rotation rot(lastStaticData->ori.getRotationTo(currData->ori));
   //                Serial.printf("rot, %f, %f\n", rot.angleDeg, rot.axis.angleDeg(currData->acc)); // debug print
