@@ -238,6 +238,14 @@ void handle_offset() {
   server.send(200, "text/plain", ch);
 }
 
+//void handle_saved_offset() {
+//  char ch[60];
+//  int offset[6];
+//  mpu.readSavedOffsets(offset);
+//  sprintf(ch, "%d, %d, %d, %d, %d, %d", offset[0], offset[1], offset[2], offset[3], offset[4], offset[5]);
+//  server.send(200, "text/plain", ch);
+//}
+
 void mpuEvent() {
   serializeMsgPack(event_doc, buf, BUF_SIZE);
   webSocket.sendBIN(client_id, buf, measureMsgPack(event_doc));
@@ -296,6 +304,7 @@ void setup() {
   server.on("/cali", [](){send_file("/cali.html");});
   server.on("/save_cali", handle_save_cali);
   server.on("/offset", handle_offset);
+//  server.on("/saved_offset", handle_saved_offset);
   server.on("/about", [](){send_template(handle_index_template, "/about.tmpl", "application/json");});
   server.begin();
   webSocket.begin();

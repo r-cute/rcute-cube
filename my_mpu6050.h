@@ -63,7 +63,10 @@ void saveOffsets(int offset[]){
   setOffsets(offset);
   Serial.printf("[mpu] save offsets: %d, %d, %d, %d, %d, %d\n", i6.i[0], i6.i[1], i6.i[2], i6.i[3], i6.i[4], i6.i[5]);
 }
-
+//uint8_t readSavedOffsets(int offset[]){
+//  offset[0]=getXAccelOffset();offset[1]=getYAccelOffset();offset[2]=getZAccelOffset();
+//  offset[3]=getXGyroOffset();offset[4]=getYGyroOffset();offset[5]=getZGyroOffset();
+//}
 uint8_t readOffsets(int offset[]){
   /*
   File f=SPIFFS.open("/offset.json", "r");
@@ -82,7 +85,7 @@ uint8_t readOffsets(int offset[]){
   int6 i6;
   EEPROM.get(EEPROM_OFFSET, i6);
   for(uint8_t o=0;o<6;o++)
-    offset[o] = i6.i[o];
+    offset[o] = i6.i[o];  
   Serial.printf("[mpu] read offsets: %d, %d, %d, %d, %d, %d\n", offset[0], offset[1], offset[2], offset[3], offset[4], offset[5]);
   return 0;
 }
@@ -245,7 +248,10 @@ void loop(){
                 }
               }
             }
-            if(state!=STATIC) state = STATIC;
+            if(state!=STATIC) {
+              state = STATIC;
+              send("static", NULL);
+            }
           }
         }else { //currData->momentaryState == MOVING: m_static -> m_moving
           if(state == STATIC){
@@ -254,6 +260,7 @@ void loop(){
             state = MOVING;
 //            Serial.println("state: moving"); // debug print
             accBuf.reset(lastStaticData);
+            send("moved", NULL);
           }
         }
       }else{ //lastData->momentaryState == MOVING        

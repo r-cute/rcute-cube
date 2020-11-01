@@ -1,3 +1,7 @@
+# rcute-cube
+
+rcute-cube is an independent part of the [Cozmars project](https://github.com/hyansuper/rcute-cozmars)
+
 # Make spiffs image
 
 `.\mkspiffs.exe -c .\rcute-cube\data\ -b 8192 -s 1048576 .\rcute-cube\spiffs.bin`
