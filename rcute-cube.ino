@@ -292,7 +292,9 @@ void setup() {
   server.on("/", [](){send_template(handle_index_template, "/index.tmpl");});
   server.on("/save_wifi", handle_save_wifi);
   server.on("/test", [](){send_file("/test.html");});
+  server.on("/teapot", [](){send_file("/teapot.html");});
   server.on("/wsmprpc.client.js", [](){send_file("/wsmprpc.client.js", "text/javascript");});
+  server.on("/p5.min.js", [](){send_file("/p5.min.js", "text/javascript");});
   server.on("/msgpack.min.js", [](){send_file("/msgpack.min.js", "text/javascript");});
   server.on("/canvasjs.min.js", [](){send_file("/canvasjs.min.js", "text/javascript");});
   server.on("/reboot", [](){send_redirect("正在重启...");delay(1000);ESP.restart();});

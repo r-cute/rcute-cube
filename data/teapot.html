@@ -1,0 +1,127 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name = "viewport" content = "width = device-width, initial-scale = 1.0, maximum-scale = 1.0, user-scalable=0">
+<script src="https://cdn.jsdelivr.net/npm/@ygoe/msgpack@1.0.2/msgpack.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/hyansuper/wsmprpc/js/client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.1.9/lib/p5.min.js"></script></head>
+  <body><main></main></body><p>让魔方静止并摆正（+Z向上，+Y向前），等图形出现后旋转魔方</p><script>
+  	function js_alter(b, src){if(b)document.write(unescape("%3Cscript src='"+src+"' type='text/javascript'%3E%3C/script%3E"));}
+js_alter(typeof msgpack=='undefined', 'msgpack.min.js');
+js_alter(typeof RPCClient=='undefined', 'wsmprpc.client.js');
+js_alter(typeof p5=='undefined', 'p5.min.js');
+  </script><script defer>
+var stub, stream_rpc, oq, rot;
+var ws=new WebSocket("ws://"+location.host+":81");
+ws.onclose=e=>{console.log("[ws] close");};
+ws.onerror=e=>{console.error("[ws] error: ",e)};
+function quat(e){return {x:e[3],y:e[4],z:e[5],w:e[6]};}
+function diff(q1,q){
+	return {w:  q1.w*q.w + q1.x*q.x + q1.y*q.y + q1.z*q.z,
+            x:  q1.w*q.x - q1.x*q.w - q1.y*q.z + q1.z*q.y,
+            y:  q1.w*q.y + q1.x*q.z - q1.y*q.w - q1.z*q.x,
+            z:  q1.w*q.z - q1.x*q.y + q1.y*q.x - q1.z*q.w};
+}
+function rotation(q){
+	var angle = Math.acos(max(-1,min(1,q.w)))*2;
+	if(angle) {
+			var s = 1/Math.sin(angle/2);
+			return {a:angle, x:q.x*s, y:q.y*s, z:q.z*s};
+		} else{
+			return {a:0,x:1,y:0,z:0};
+		}
+}
+ws.onopen=async(e)=>{
+	console.log("[ws] open");
+	if('-1'==await new Promise(r=>{ws.onmessage=e=>{r(e.data)}})) {alert("请先关闭其他正在连接 rcute-cube 的程序");return;}
+	stub=new RPCClient(ws);	
+	stream_rpc=stub.rpc('mpu_data', []);
+	var count=0;
+	for await(var e of stream_rpc){
+		if(count++>50){
+			oq = quat(e);
+			console.log('start: ', oq);
+			break;
+		}
+	}
+	for await(var e of stream_rpc){
+		rot=rotation(diff(oq,quat(e)));
+	}
+};
+function setup() {createCanvas(400, 400, WEBGL);}
+function draw() {  
+  background(64);
+  if(!rot) return;  
+  push();
+  // draw main body in red
+  fill(255, 0, 0);
+  rotate(rot.a, [-rot.x,rot.z,rot.y]);
+  box(10, 10, 200);
+  // draw wings in green
+  fill(0, 255, 0);
+  beginShape(TRIANGLES);
+  vertex(-100, 2, 30);
+  vertex(0, 2, -80);
+  vertex(100, 2, 30);  // wing top layer
+  vertex(-100, -2, 30);
+  vertex(0, -2, -80);
+  vertex(100, -2, 30);  // wing bottom layer
+  endShape();
+  // draw wing edges in slightly darker green
+  fill(0, 192, 0);
+  beginShape(TRIANGLES);
+  vertex(-100, 2, 30);  // No quads so use 2 triangles to cover wing edges
+  vertex(-100, -2, 30);
+  vertex(  0, 2, -80);
+  
+  vertex(  0, 2, -80);
+  vertex(  0, -2, -80);
+  vertex(-100, -2, 30); // Left wing edge
+  vertex( 100, 2, 30);
+  vertex( 100, -2, 30);
+  vertex(  0, -2, -80);
+  vertex(  0, -2, -80);
+  vertex(  0, 2, -80);
+  vertex( 100, 2, 30);  // Right wing edge
+  vertex(-100, 2, 30);
+  vertex(-100, -2, 30);
+  vertex(100, -2, 30);
+  vertex(100, -2, 30);
+  vertex(100, 2, 30);
+  vertex(-100, 2, 30);  // Back wing edge
+  endShape();
+  // draw tail in green
+  fill(0, 255, 0);
+  beginShape(TRIANGLES);
+  vertex(-2, 0, 98);
+  vertex(-2, -30, 98);
+  vertex(-2, 0, 70);  // tail left layer
+  vertex( 2, 0, 98);
+  vertex( 2, -30, 98);
+  vertex( 2, 0, 70);  // tail right layer
+  endShape();
+  // draw tail edges in slightly darker green
+  fill(0, 192, 0);
+  beginShape(TRIANGLES);
+  vertex(-2, 0, 98);
+  vertex(2, 0, 98);
+  vertex(2, -30, 98);
+  vertex(2, -30, 98);
+  vertex(-2, -30, 98);
+  vertex(-2, 0, 98);  // tail back edge
+  vertex(-2, 0, 98);
+  vertex(2, 0, 98);
+  vertex(2, 0, 70);
+  vertex(2, 0, 70);
+  vertex(-2, 0, 70);
+  vertex(-2, 0, 98);  // tail front edge
+  
+  vertex(-2, -30, 98);
+  vertex(2, -30, 98);
+  vertex(2, 0, 70);
+  vertex(2, 0, 70);
+  vertex(-2, 0, 70);
+  vertex(-2, -30, 98);
+  endShape();
+  pop();
+}
+  </script>
+</html>

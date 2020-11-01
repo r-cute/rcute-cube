@@ -23,7 +23,7 @@ uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 int16_t raw[6];
-long rawUpdateTime = 0;
+long rawUpdateTime =0, updateTime =0;
 
 // orientation/motion vars
 //Quaternion q;           // [w, x, y, z]         quaternion container
@@ -41,7 +41,6 @@ MPUCallback cbUpdate = NULL;
 long momentaryStaticStart = 0;
 MPUData mpudata[3], *currData=mpudata, *lastData=NULL, *lastStaticData=NULL;
 MPUState_t state = MOVING;
-long updateTime = 0;
 
 void saveOffsets(int offset[]){
   /*
@@ -197,7 +196,8 @@ void loop(){
     currData->time = millis();
     currData->setMomentaryState(lastData);
 
-    if(cbUpdate) {
+    if(cbUpdate && currData->time - updateTime> 50) {
+      updateTime = currData->time;
       cbUpdate();
     }
     
@@ -216,7 +216,7 @@ void loop(){
           float duration = currData->time - momentaryStaticStart;
           if(duration > 300){            
             if(state==MOVING){
-              if(lastStaticData && currData->time - lastStaticData->time < 2500){
+              if(lastStaticData && currData->time - lastStaticData->time < 2000){
                 float ang = lastStaticData->acc.angleDeg(currData->acc);
   //              Serial.printf("ang %f\n", ang); // debug print
                 if(fabs(ang-90)<15) send("flipped", "90");
@@ -236,7 +236,7 @@ void loop(){
                     }else {
                       char mc[3];
                       float velMag2=accBuf.vel.getMagnitude2(), distMag2=accBuf.dist.getMagnitude2();
-                      if(velMag2>900){ // tilt
+                      if(velMag2>1000){ // tilt
                         accBuf.vel.getMainCompInv(mc);
                         send("tilted", mc);
                       }else if(fabs(accBuf.dist.angleDeg(currData->acc)-90)<20 && distMag2> 4.0f && velMag2<distMag2*16) { // push 2cm

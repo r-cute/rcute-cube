@@ -13,7 +13,7 @@ function sleep(sec){return new Promise((r,j)=>{setTimeout(r,sec*1000)})}
 js_alter(typeof msgpack=='undefined', 'msgpack.min.js');
 js_alter(typeof RPCClient=='undefined', 'wsmprpc.client.js');</script><script defer>
 async function rgb(){await stub.rpc('rgb', [q('#r').value,q('#g').value,q('#b').value]);}
-var stub, dataLen=200,chart, dps=[], stream_rpc, interval;
+var stub, dataLen=200,chart, dps=[], stream_rpc/*, interval*/;
 async function sensor(){
 	var b=q('#toggleSensor');
 	if(b.innerText=='开始'){
@@ -50,19 +50,23 @@ window.onload=()=>{
 	});
 	chart.render();
 	var ws=new WebSocket("ws://"+location.host+":81");
-	ws.onclose=e=>{console.log("[ws] close");clearInterval(interval)};
+	ws.onclose=e=>{console.log("[ws] close");/*clearInterval(interval)*/};
 	ws.onerror=e=>{console.error("[ws] error: ",e)};
 	ws.onopen=async(e)=>{
 		console.log("[ws] open");
 		if('-1'==await new Promise(r=>{ws.onmessage=e=>{r(e.data)}})) {alert("请先关闭其他正在连接 rcute-cube 的程序");return;}
 		stub=new RPCClient(ws);
-		interval=setInterval((async ()=>{
-			q('#static').innerText=(await stub.rpc("mpu_static",[]))?'静止':'移动';
-		}),1000);
+		// interval=setInterval((async ()=>{
+		// 	q('#static').innerText=(await stub.rpc("mpu_static",[]))?'静止':'移动';
+		// }),1000);
 		(async ()=>{
-			for await(var e of stub.rpc('mpu_event', [])){
-				console.log("motion: ", e);
-				q('#gesture').innerText=e;
+			for await(var e of stub.rpc('mpu_event', [])){				
+				if(e[0]=='static') q('#static').innerText='静止';
+				else if(e[0]=='moved') q('#static').innerText='移动';
+				else{
+					console.log("motion: ", e);
+					q('#gesture').innerText=e;
+				}
 			}
 		})();
 	};
