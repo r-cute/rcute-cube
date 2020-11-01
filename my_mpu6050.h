@@ -36,6 +36,7 @@ AccelBuffer accBuf;
 JsonArray* event_array;
 
 MPUCallback cbEvent = NULL;
+MPUCallback cbRawUpdate = NULL;
 MPUCallback cbUpdate = NULL;
 long momentaryStaticStart = 0;
 MPUData mpudata[3], *currData=mpudata, *lastData=NULL, *lastStaticData=NULL;
@@ -59,6 +60,7 @@ void saveOffsets(int offset[]){
     i6.i[o] = offset[o];
   EEPROM.put(EEPROM_OFFSET, i6);
   EEPROM.commit();
+  setOffsets(offset);
   Serial.printf("[mpu] save offsets: %d, %d, %d, %d, %d, %d\n", i6.i[0], i6.i[1], i6.i[2], i6.i[3], i6.i[4], i6.i[5]);
 }
 
@@ -142,7 +144,7 @@ uint8_t setup(JsonArray* ea){
   Serial.println(F("[mpu] DMP ready! Waiting for first interrupt..."));
   dmpReady = true;
   packetSize = dmpGetFIFOPacketSize();
-  sleeping =false;
+  sleep(true);
   return 0;
 }
 
@@ -192,14 +194,17 @@ void loop(){
     currData->time = millis();
     currData->setMomentaryState(lastData);
 
-    if(cbUpdate && currData->time - rawUpdateTime> 50){
+    if(cbUpdate) {
+      cbUpdate();
+    }
+    
+    if(cbRawUpdate && currData->time - rawUpdateTime> 50){
       rawUpdateTime = currData->time;
       getMotion6(&raw[0],&raw[1],&raw[2],&raw[3],&raw[4],&raw[5]);
-      cbUpdate();      
+      cbRawUpdate();      
     }
 
-    
-    if(state==MOVING && lastStaticData && currData->momentaryState==MOVING)
+    if(state!=STATIC && lastStaticData && currData->momentaryState==MOVING)
       accBuf.feed(currData->acc, currData->ori, (currData->time - lastData->time)/1000.0f);
       
     if(cbEvent && lastData){
@@ -291,7 +296,7 @@ void loop(){
 }
 
 uint8_t dmpGetAccel(VectorInt16 *a, VectorFloat *q, const uint8_t* packet) {
-    // 2g? or 8g?
+    // full scale 8g, -4g:4g
     uint8_t status = MPU6050::dmpGetAccel(a, packet);
     if (status == 0) {
         q -> x = (float)a->x * 0.00119628906f;
@@ -301,16 +306,16 @@ uint8_t dmpGetAccel(VectorInt16 *a, VectorFloat *q, const uint8_t* packet) {
     return status;
 }
 
-uint8_t dmpGetGyro(VectorInt16 *q, const uint8_t* packet) {
-  //2000 full range
-    static int16_t qI[3];
-    uint8_t status = MPU6050::dmpGetGyro(qI, packet);
-    if(status == 0){
-      q->x = qI[0];
-      q->y = qI[1];
-      q->z = qI[2];      
-    }
-    return status;
-}
+//uint8_t dmpGetGyro(VectorInt16 *q, const uint8_t* packet) {
+//  //2000 full range
+//    static int16_t qI[3];
+//    uint8_t status = MPU6050::dmpGetGyro(qI, packet);
+//    if(status == 0){
+//      q->x = qI[0];
+//      q->y = qI[1];
+//      q->z = qI[2];      
+//    }
+//    return status;
+//}
 
 };

@@ -17,7 +17,13 @@ js_alter(typeof msgpack=='undefined', 'msgpack.min.js');
 js_alter(typeof RPCClient=='undefined', 'wsmprpc.client.js');
 function q(d){return document.querySelector(d)}function qa(d){return document.querySelectorAll(d)}
 </script><script defer>
-var offset=[], stub, avg=[];
+var old_offset=[];
+fetch('offset').then(j=>j.text()).then(o=>{
+	o=o.split(', ');
+	for(var i=0;i<6;i++)
+		old_offset[i]=parseInt(o[i]);
+});
+var stub, avg=[], offset=[];
 var discardNum=200, caliNum=200;
 qa('#cali>p>button').forEach(b=>{b.onclick=async()=>{
 	qa('button').forEach(a=>{a.disabled=true});	
@@ -28,13 +34,14 @@ qa('#cali>p>button').forEach(b=>{b.onclick=async()=>{
 	}
 	var av=[0,0,0,0];count=0;
 	for await(var e of stream_rpc){
-		av[0]+=e[b.getAttribute('data')];
+		av[0]+=e[Math.floor(b.getAttribute('data')/2)];
 		for(var ii=1;ii<4;ii++)av[ii]+=e[ii+2];
 		count++;if(count==caliNum)break;
 	}
 	stream_rpc.cancel();
 	for(var ii=0;ii<4;ii++)av[ii]/=caliNum;
 	avg[b.getAttribute('data')]=av;
+	console.log(b.parentElement.id, av);
 	qa('#cali button').forEach(a=>{a.disabled=false});
 	b.parentElement.getElementsByTagName('span')[0].innerText='已完成';
 	if(Array.from(qa('#cali span')).find(e=>e.textContent=='')==undefined)
@@ -42,13 +49,15 @@ qa('#cali>p>button').forEach(b=>{b.onclick=async()=>{
 };});
 q('#save>button').onclick=()=>{
 	for(var ii=0;ii<3;ii++)
-		offset[ii]=parseInt((avg[ii*2][0]+avg[ii*2+1][0])/2);
+		offset[ii]=(avg[ii*2][0]+avg[ii*2+1][0])/2;
 	for(var jj=0;jj<3;jj++){
 		offset[jj+3]=0;
 		for(var ii=0;ii<6;ii++)
 			offset[jj+3]+=avg[ii][jj+1];
 		offset[jj+3]/=6;
 	}
+	for(var jj=0;jj<6;jj++)
+		offset[jj]=parseInt(old_offset[jj]-offset[jj]);
 	fetch('save_cali?offset='+offset.join()).then(d=>d.text()).then(a=>{q('#save>span').innerText=a;setTimeout(()=>{q('#save>span').innerText=''},5000);}).catch(alert);
 };
 var ws=new WebSocket("ws://"+location.host+":81");

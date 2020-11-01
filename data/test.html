@@ -60,8 +60,10 @@ window.onload=()=>{
 			q('#static').innerText=(await stub.rpc("mpu_static",[]))?'静止':'移动';
 		}),1000);
 		(async ()=>{
-			for await(var e of stub.rpc('mpu_event', []))
+			for await(var e of stub.rpc('mpu_event', [])){
+				console.log("motion: ", e);
 				q('#gesture').innerText=e;
+			}
 		})();
 	};
 };

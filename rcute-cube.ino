@@ -14,18 +14,15 @@
 ESP8266WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 #define BUF_SIZE 200
-StaticJsonDocument<BUF_SIZE> recv_doc;
-StaticJsonDocument<BUF_SIZE> send_doc;
-StaticJsonDocument<BUF_SIZE> data_doc;
-StaticJsonDocument<BUF_SIZE> event_doc;
-JsonArray data_trunck_array, event_trunck_array;
+StaticJsonDocument<BUF_SIZE> send_doc, recv_doc, raw_data_doc, data_doc, event_doc;
+JsonArray raw_data_trunck_array, data_trunck_array, event_trunck_array;
 uint8_t buf[BUF_SIZE];
 UpgradeHelper upgrade;
 RGB rgb;
 WIFI wifi;
 MyMPU6050 mpu;
 uint8_t mpuStarted;
-long mpu_event_msgid, mpu_data_msgid, mpu_data_start;
+long mpu_event_msgid, mpu_raw_update_msgid, mpu_update_msgid, mpu_raw_data_start;
 uint8_t client_id; 
 
 void serialize_send(StaticJsonDocument<BUF_SIZE>& doc){
@@ -99,8 +96,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
               send_doc[3] = mpu.state==STATIC;
               serialize_send(send_doc);
             }else if(strcmp(method, "mpu_raw")==0) {
-              data_doc[1] = mpu_data_msgid = msgid;
-              mpu_data_start = millis();
+              raw_data_doc[1] = mpu_raw_update_msgid = msgid;
+              mpu_raw_data_start = millis();
+              mpu.cbRawUpdate = mpuRawUpdate;
+            }else if(strcmp(method, "mpu_data")==0) {
+              data_doc[1] = mpu_update_msgid = msgid;
               mpu.cbUpdate = mpuUpdate;
             }else if(strcmp(method, "mpu_event")==0) {
               event_doc[1] = mpu_event_msgid = msgid;
@@ -117,16 +117,16 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             
           case MTYPE_REQUEST_CANCEL:
 //            Serial.printf("[rpc] %d, %ld\n", msgtype, msgid); // debug print
-            if(msgid== mpu_data_msgid) mpu.cbUpdate = NULL;
+            if(msgid== mpu_raw_update_msgid) mpu.cbRawUpdate = NULL;
             else if(msgid== mpu_event_msgid) mpu.cbEvent = NULL;
+            else if(msgid== mpu_update_msgid) mpu.cbUpdate = NULL;
             break;
         }
       }
       break;
     case WStype_DISCONNECTED:
       Serial.printf("[ws] disconn (%u)\n", num);
-      mpu.cbUpdate = NULL;
-      mpu.cbEvent = NULL;
+      mpu.cbRawUpdate = mpu.cbEvent = mpu.cbUpdate = NULL;
       mpu.sleep(true);
       rgb.rgb(0,0,0);
       break;
@@ -138,12 +138,13 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       }else{
         webSocket.sendTXT(num, "0");
         client_id = num;
-        mpuStarted = mpu.setup(&event_trunck_array);
-        if(mpuStarted) {
-          Serial.printf("MPU error %d\n", mpuStarted);
-          rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);          
-          mpu.sleep(true);
-        }
+        mpu.sleep(false);
+//        mpuStarted = mpu.setup(&event_trunck_array);
+//        if(mpuStarted) {
+//          Serial.printf("MPU error %d\n", mpuStarted);
+//          rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);          
+//          mpu.sleep(true);
+//        }
       }
       break;
     case WStype_TEXT:
@@ -229,26 +230,48 @@ void handle_upgrade_ret() {
 	  send_body("更新成功，重启后生效，<a href='/'>返回</a><br><br><form action='reboot'><input type='submit' value='重启'/></form>");
 }
 
+void handle_offset() {
+  char ch[60];
+  int offset[6];
+  mpu.readOffsets(offset);
+  sprintf(ch, "%d, %d, %d, %d, %d, %d", offset[0], offset[1], offset[2], offset[3], offset[4], offset[5]);
+  server.send(200, "text/plain", ch);
+}
+
 void mpuEvent() {
   serializeMsgPack(event_doc, buf, BUF_SIZE);
   webSocket.sendBIN(client_id, buf, measureMsgPack(event_doc));
 }
 
-void mpuUpdate() {
+void mpuRawUpdate() {
   for(uint8_t i=0;i<6;i++)
-    data_trunck_array[i]=mpu.raw[i];
-  data_trunck_array[6]=(mpu.rawUpdateTime-mpu_data_start)/1000.0f;
+    raw_data_trunck_array[i]=mpu.raw[i];
+  raw_data_trunck_array[6]=(mpu.rawUpdateTime-mpu_raw_data_start)/1000.0f;
+  serializeMsgPack(raw_data_doc, buf, BUF_SIZE);
+  webSocket.sendBIN(client_id, buf, measureMsgPack(raw_data_doc));
+}
+
+void mpuUpdate() {  
+  data_trunck_array[0]=mpu.currData->acc.x;
+  data_trunck_array[1]=mpu.currData->acc.y;
+  data_trunck_array[2]=mpu.currData->acc.z;
+  data_trunck_array[3]=mpu.currData->ori.x;
+  data_trunck_array[4]=mpu.currData->ori.y;
+  data_trunck_array[5]=mpu.currData->ori.z;
+  data_trunck_array[6]=mpu.currData->ori.w;
   serializeMsgPack(data_doc, buf, BUF_SIZE);
   webSocket.sendBIN(client_id, buf, measureMsgPack(data_doc));
 }
 
 void setup() {
   //return msgpack 
-  data_doc[0] = event_doc[0] =MTYPE_RESPONSE_STREAM_CHUNCK;
-  data_doc[1] = event_doc[1] =0l;
+  raw_data_doc[0] = data_doc[0] = event_doc[0] =MTYPE_RESPONSE_STREAM_CHUNCK;
+  raw_data_doc[1] = data_doc[1] = event_doc[1] =0l;
+  raw_data_trunck_array = raw_data_doc.createNestedArray();
   data_trunck_array = data_doc.createNestedArray();
   event_trunck_array = event_doc.createNestedArray();
   rgb.setup();
+  rgb.blink_rgb(100,100,100,1,500);
   rgb.led(true);
   Serial.begin(115200);  
   Serial.println();
@@ -272,15 +295,16 @@ void setup() {
   server.on("/format_fs", [](){send_body("Format SPIFFS..." + String(SPIFFS.format()? "completed": "error"));});
   server.on("/cali", [](){send_file("/cali.html");});
   server.on("/save_cali", handle_save_cali);
+  server.on("/offset", handle_offset);
   server.on("/about", [](){send_template(handle_index_template, "/about.tmpl", "application/json");});
   server.begin();
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
-//  mpuStarted = mpu.setup(&event_trunck_array);
-//  if(mpuStarted) {
-//    Serial.printf("MPU error %d\n", mpuStarted);
-//    rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
-//  }
+  mpuStarted = mpu.setup(&event_trunck_array);
+  if(mpuStarted) {
+    Serial.printf("MPU error %d\n", mpuStarted);
+    rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
+  }
   // there should be no delay after mpu starts and immediately goto loop()
   rgb.led(false);
 }
