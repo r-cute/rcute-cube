@@ -2,7 +2,7 @@
 <h2>rcute-cube</h2>
 <p>rcute-cube 魔方是教育机器人 Cozmars 的一个可编程组件</p><p>Cube 魔方及 Cozmars 机器人的用法详见 <a href='https://rcute-cozmars.readthedocs.io/zh_CN/latest/'> Cozmars 文档 </a></p>
 <h3>关于</h3><p>序列号 {sn}<br>MAC {mac}<br>WIFI {wifi} mode<br>IP {local_ip}<form action='upgrade?' id='upgradeForm'>
-固件: 当前版本 <span id='ver'>{version}</span><!-- ，最新版本 <span id='latest_ver'>...</span> <span id='partial_upgrade' style='display:none'>(更新未完成)</span> -->
+固件: 当前版本 {version} <span id='latest_ver' style='display:none'></span> <span id='partial_upgrade' style='display:none'>(更新未完成)</span>
 <input type='submit' value='更新' style='display:none' id='upgrade'/></form></p>
 <h3>测试</h3>功能及传感器测试
 <a href='test'><button>测试</button></a>&nbsp;&nbsp;&nbsp;<a href='teapot'><button>演示</button></a>
@@ -21,27 +21,28 @@ function showhide(){
     if(a.innerText=='显示'){p.type='text';a.innerText='隐藏';}
     else{p.type='password';a.innerText='显示';}
 }
-// fetch('https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/version.h').then(d=>d.text()).then(d=>{
-// 	d=d.split('\n').map(a=>a.split(' ')[2].replaceAll('"',''));
-// 	if(d=='fetch') return;
-//    	q('#latest_ver').innerText=d[0];
-// 	// var sketch_url='sketch=https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/rcute-cube.ino.generic.bin';
-// 	// var spiffs_url='spiffs=https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/spiffs.bin';
-// 	var sketch_url='sketch=https://github.com/hyansuper/rcute-cube/releases/download/'+d+'/rcute-cube.ino.generic.bin';
-// 	var spiffs_url='spiffs=https://github.com/hyansuper/rcute-cube/releases/download/'+d+'/spiffs.bin';
-//    	if(d[0]!='{version}'){
-// 		q('#upgrade').style.display='inline';
-// 		switch(d[1]){
-// 			case 'both': q('#upgradeForm').action='upgrade?'+sketch_url+'&'+spiffs_url;break;
-// 			case 'sketch': q('#upgradeForm').action='upgrade?'+sketch_url;break;
-// 			case 'spiffs': q('#upgradeForm').action='upgrade?'+spiffs_url;break;
-// 		}
-// 	}else if('{upgrade_log}'!=d[1]){
-// 		q('#upgrade').style.display=q('#partial_upgrade').style.display='inline';
-// 		switch('{upgrade_log}'){
-// 			case 'spiffs': q('#upgradeForm').action='upgrade?'+sketch_url;break;
-// 			case 'sketch': q('#upgradeForm').action='upgrade?'+spiffs_url;break;
-// 		}
-// 	}
-// });
+fetch('https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/version.h').then(d=>d.text()).then(d=>{
+	d=d.split('\n').map(a=>a.split(' ')[2].replaceAll('"',''));
+	if(d[0] && d[0][0]!='v') return;
+	q('#latest_ver').style.display='inline';
+   	q('#latest_ver').innerText='，最新版本 '+d[0];
+	// var sketch_url='sketch=https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/rcute-cube.ino.generic.bin';
+	// var spiffs_url='spiffs=https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/spiffs.bin';
+	var sketch_url='sketch=https://github.com/hyansuper/rcute-cube/releases/download/'+d[0]+'/rcute-cube.ino.generic.bin';
+	var spiffs_url='spiffs=https://github.com/hyansuper/rcute-cube/releases/download/'+d[0]+'/spiffs.bin';
+   	if(d[0]!='{version}'){
+		q('#upgrade').style.display='inline';
+		switch(d[1]){
+			case 'both': q('#upgradeForm').action='upgrade?'+sketch_url+'&'+spiffs_url;break;
+			case 'sketch': q('#upgradeForm').action='upgrade?'+sketch_url;break;
+			case 'spiffs': q('#upgradeForm').action='upgrade?'+spiffs_url;break;
+		}
+	}else if('{upgrade_log}'!=d[1]){
+		q('#upgrade').style.display=q('#partial_upgrade').style.display='inline';
+		switch('{upgrade_log}'){
+			case 'spiffs': q('#upgradeForm').action='upgrade?'+sketch_url;break;
+			case 'sketch': q('#upgradeForm').action='upgrade?'+spiffs_url;break;
+		}
+	}
+});
 </script></html>
