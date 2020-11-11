@@ -71,8 +71,15 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 //            Serial.printf("[rpc] %d, %ld, %s, (%d)[...]\n", msgtype, msgid, method, params.size()); // debug print
             
             if(strcmp(method, "rgb")==0) {
-              rgb.rgb(params[0], params[1], params[2]);
-              send_response(NULL, NULL);
+              if(params.size()){                
+                rgb.rgb(params[0], params[1], params[2]);
+                send_response(NULL, NULL);
+              }else{
+                send_doc[2] = (char*)NULL;
+                JsonArray rgb_array = send_doc.createNestedArray();
+                rgb_array.add(rgb.r);rgb_array.add(rgb.g);rgb_array.add(rgb.b);
+                serialize_send(send_doc);
+              }
             }else if(strcmp(method, "led")==0) {
               rgb.led(params[0]);
               send_response(NULL, NULL);

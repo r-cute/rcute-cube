@@ -154,7 +154,8 @@ void send(const char* a, const char* b){
 //  Serial.print(a);  Serial.println(b); // debug print
   (*event_array)[0]=a;
   (*event_array)[1]=b;
-  if(cbEvent) cbEvent();
+//  if(cbEvent) 
+  cbEvent();
 }
 
 void loop(){
