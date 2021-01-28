@@ -274,12 +274,12 @@ void loop(){
               send("fall", NULL);
               state = MOTION_DETECTED;
             }
-            /*if(accBuf.filterCount > 20) { // shaked hard
-              send("shaked", "hard");
+            /*if(accBuf.filterCount > 20) { // shaken hard
+              send("shaken", "hard");
               state = MOTION_DETECTED;              
-            }*/else if(accBuf.shakeCount > 10) { // shaked not so hard
-//              send("shaked", "median");
-              send("shaked", NULL);
+            }*/else if(accBuf.shakeCount > 10) { // shaken not so hard
+//              send("shaken", "median");
+              send("shaken", NULL);
               state = MOTION_DETECTED;
             }
           } else if(state== MOTION_DETECTED){
