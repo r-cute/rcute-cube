@@ -21,15 +21,15 @@ function showhide(){
     if(a.innerText=='显示'){p.type='text';a.innerText='隐藏';}
     else{p.type='password';a.innerText='显示';}
 }
-fetch('https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/version.h').then(d=>d.text()).then(d=>{
+fetch('https://cdn.jsdelivr.net/gh/r-cute/rcute-cube@release/version.h').then(d=>d.text()).then(d=>{
 	d=d.split('\n').map(a=>a.split(' ')[2].replaceAll('"',''));
 	if(d[0] && d[0][0]!='v') return;
 	q('#latest_ver').style.display='inline';
    	q('#latest_ver').innerText='，最新版本 '+d[0];
-	// var sketch_url='sketch=https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/rcute-cube.ino.generic.bin';
-	// var spiffs_url='spiffs=https://cdn.jsdelivr.net/gh/hyansuper/rcute-cube@release/spiffs.bin';
-	var sketch_url='sketch=https://github.com/hyansuper/rcute-cube/releases/download/'+d[0]+'/rcute-cube.ino.generic.bin';
-	var spiffs_url='spiffs=https://github.com/hyansuper/rcute-cube/releases/download/'+d[0]+'/spiffs.bin';
+	// var sketch_url='sketch=https://cdn.jsdelivr.net/gh/r-cute/rcute-cube@release/rcute-cube.ino.generic.bin';
+	// var spiffs_url='spiffs=https://cdn.jsdelivr.net/gh/r-cute/rcute-cube@release/spiffs.bin';
+	var sketch_url='sketch=https://github.com/r-cute/rcute-cube/releases/download/'+d[0]+'/rcute-cube.ino.generic.bin';
+	var spiffs_url='spiffs=https://github.com/r-cute/rcute-cube/releases/download/'+d[0]+'/spiffs.bin';
    	if(d[0]!='{version}'){
 		q('#upgrade').style.display='inline';
 		switch(d[1]){

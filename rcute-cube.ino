@@ -279,6 +279,7 @@ void mpuUpdate() {
 }
 
 void setup() {
+  rgb.led(false);
   //return msgpack 
   raw_data_doc[0] = data_doc[0] = event_doc[0] =MTYPE_RESPONSE_STREAM_CHUNCK;
   raw_data_doc[1] = data_doc[1] = event_doc[1] =0l;
@@ -287,12 +288,12 @@ void setup() {
   event_trunck_array = event_doc.createNestedArray();
   rgb.setup();
   rgb.blink_rgb(100,100,100,1,500);
-  rgb.led(true);
+//  rgb.led(true);
   Serial.begin(115200);  
   Serial.println();
   EEPROM.begin(512);
   if(!SPIFFS.begin()) {
-    Serial.println("FPIFFS error");
+    Serial.println("SPIFFS error");
     rgb.blink_rgb(100, 0, 0, 2, 250, 750);
   }
   rgb.blink_rgb(0, 100, 0, wifi.setup(), 250, 750);
@@ -324,7 +325,7 @@ void setup() {
     rgb.blink_rgb(0, 0, 100, mpuStarted, 250, 750);
   }
   // there should be no delay after mpu starts and immediately goto loop()
-  rgb.led(false);
+//  rgb.led(false);
 }
 void loop() {
   mpu.loop();
