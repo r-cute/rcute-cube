@@ -226,7 +226,7 @@ void loop(){
                   Rotation rot(lastStaticData->ori.getRotationTo(currData->ori));
   //                Serial.printf("rot, %f, %f\n", rot.angleDeg, rot.axis.angleDeg(currData->acc)); // debug print
                   if(rot.angleDeg > 35) {
-                    send("rotated", fabs(rot.axis.angleDeg(currData->acc))<10 ? "CCW":"CW");
+                    send("rotated", fabs(rot.axis.angleDeg(currData->acc))<10 ? "ccw":"cw");
                   } else if(rot.angleDeg < 15){ // no rotation, check horizontal move(push)
 //                    Serial.printf("push: ang:%f, vel.mag:%f, dist.mag:%f\n", accBuf.dist.angleDeg(currData->acc),accBuf.vel.getMagnitude(),accBuf.dist.getMagnitude()); // debug print
 //                    Serial.printf("dist(x,y,z): %f, %f, %f\n",accBuf.dist.x, accBuf.dist.y, accBuf.dist.z);// debug print

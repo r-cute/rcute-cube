@@ -211,16 +211,16 @@ class VectorFloat {
         void getMainComp(char a[]){
           a[2]='\0';
           float ax=fabs(x),ay=fabs(y),az=fabs(z);
-          if(ax>=ay&&ax>=az){a[1]='X';a[0]=x>0?'+':'-';}
-          else if(ay>=ax&&ay>=az){a[1]='Y';a[0]=y>0?'+':'-';}
-          else{a[1]='Z';a[0]=z>0?'+':'-';}
+          if(ax>=ay&&ax>=az){a[1]='x';a[0]=x>0?'+':'-';}
+          else if(ay>=ax&&ay>=az){a[1]='y';a[0]=y>0?'+':'-';}
+          else{a[1]='z';a[0]=z>0?'+':'-';}
         }
         void getMainCompInv(char a[]){
           a[2]='\0';
           float ax=fabs(x),ay=fabs(y),az=fabs(z);
-          if(ax>=ay&&ax>=az){a[1]='X';a[0]=x<0?'+':'-';}
-          else if(ay>=ax&&ay>=az){a[1]='Y';a[0]=y<0?'+':'-';}
-          else{a[1]='Z';a[0]=z<0?'+':'-';}
+          if(ax>=ay&&ax>=az){a[1]='x';a[0]=x<0?'+':'-';}
+          else if(ay>=ax&&ay>=az){a[1]='y';a[0]=y<0?'+':'-';}
+          else{a[1]='z';a[0]=z<0?'+':'-';}
         }
         bool compLessThan(float a){
           return fabs(x)<a && fabs(y)<a && fabs(z)<a;
